@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="dark" />
   <title>Free Codex — Admin</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -18,145 +19,295 @@
             sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
             mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
           },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'gradient': 'gradient 8s ease infinite',
+          },
+          keyframes: {
+            gradient: {
+              '0%, 100%': { backgroundPosition: '0% 50%' },
+              '50%': { backgroundPosition: '100% 50%' },
+            }
+          },
           boxShadow: {
-            glow: '0 0 0 1px rgb(45 212 191 / 0.15), 0 24px 48px -12px rgb(0 0 0 / 0.45)',
+            'glow': '0 0 0 1px rgb(45 212 191 / 0.15), 0 24px 48px -12px rgb(0 0 0 / 0.45)',
+            'glow-lg': '0 0 0 1px rgb(59 130 246 / 0.2), 0 32px 64px -16px rgb(0 0 0 / 0.5)',
+            'inner-glow': 'inset 0 1px 0 0 rgb(255 255 255 / 0.05)',
           },
         },
       },
     };
   </script>
   <link rel="stylesheet" href="/admin/static/styles.css" />
+  <style>
+    body {
+      background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #0c1a2e 100%);
+    }
+    .gradient-border {
+      position: relative;
+    }
+    .gradient-border::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, #14b8a6 0%, #3b82f6 50%, #8b5cf6 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    .status-dot {
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px currentColor; }
+      50% { opacity: 0.7; box-shadow: 0 0 16px currentColor; }
+    }
+    .input-glow:focus {
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15), 0 0 20px rgba(20, 184, 166, 0.1);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);
+      transition: all 0.2s ease;
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #0f766e 0%, #0e7490 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 25px -5px rgba(20, 184, 166, 0.4);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+    .section-icon {
+      background: linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(59, 130, 246, 0.1) 100%);
+    }
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(71, 85, 105, 0.7);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 0.9);
+    }
+    .loading-shimmer {
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+  </style>
 </head>
-<body class="h-full bg-slate-950 text-slate-100 font-sans selection:bg-teal-500/30 selection:text-teal-100">
-  <div class="min-h-full bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(20,184,166,0.14),transparent_50%),radial-gradient(ellipse_80%_50%_at_100%_0%,rgba(59,130,246,0.08),transparent_45%)]">
-    <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-20">
-      <div class="mx-auto max-w-5xl px-3 sm:px-5 py-2 sm:py-2.5">
-        <div class="flex flex-row items-center justify-between gap-3">
-          <div class="min-w-0 flex items-center gap-2.5">
-            <span class="hidden sm:flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-teal-400 ring-1 ring-slate-700/80" aria-hidden="true">
-              <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
-            </span>
-            <div class="min-w-0">
-              <h1 class="text-base sm:text-lg font-semibold tracking-tight text-white truncate">Free Codex Admin</h1>
-              <p class="text-[11px] sm:text-xs text-slate-500 truncate">
-                <code class="rounded bg-slate-900 px-1 py-0.5 font-mono text-[10px] text-teal-200/80 ring-1 ring-slate-800">~/.config/free-codex/.env</code>
-                <span class="text-slate-600"> · </span>console
-              </p>
+<body class="h-full text-slate-100 font-sans selection:bg-teal-500/30 selection:text-teal-100">
+  <!-- Ambient background effects -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-40 -right-40 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
+  </div>
+
+  <div class="relative min-h-full">
+    <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/50">
+      <div class="mx-auto max-w-5xl px-4 sm:px-6 py-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="relative">
+              <div class="flex size-12 items-center justify-center rounded-2xl gradient-border bg-slate-900/80 shadow-lg">
+                <svg class="size-6 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+                </svg>
+              </div>
+              <div class="absolute -top-1 -right-1 size-3 bg-emerald-400 rounded-full status-dot shadow-[0_0_10px_rgba(52,211,153,0.8)]"></div>
+            </div>
+            <div>
+              <h1 class="text-xl font-bold text-white tracking-tight">Free Codex</h1>
+              <p class="text-sm text-slate-400">Admin Dashboard</p>
             </div>
           </div>
-          <a href="/health" target="_blank" rel="noopener" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1.5 text-xs font-medium text-teal-400 hover:border-slate-700 hover:text-teal-300 transition-colors">
-            <span class="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.55)]" aria-hidden="true"></span>
-            <span class="text-slate-300">Health</span>
-            <svg class="size-3.5 opacity-70" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-          </a>
+          <div class="flex items-center gap-4">
+            <a href="/health" target="_blank" rel="noopener"
+              class="inline-flex items-center gap-2 rounded-xl border border-slate-700/50 bg-slate-900/50 backdrop-blur px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:border-slate-600 transition-all">
+              <span class="size-2 rounded-full bg-emerald-400 status-dot"></span>
+              <span>Healthy</span>
+              <svg class="size-4 opacity-50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
     </header>
 
-    <main class="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-10 pb-16 space-y-8">
-      <div id="banner" class="hidden rounded-xl border px-4 py-3 text-sm leading-relaxed font-medium" role="status" aria-live="polite"></div>
+    <main class="mx-auto max-w-5xl px-4 sm:px-6 py-8 space-y-6">
+      <!-- Banner for status messages -->
+      <div id="banner" class="hidden rounded-2xl glass-card p-4 text-sm" role="status" aria-live="polite"></div>
 
-      <section class="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-5 sm:p-6 shadow-glow backdrop-blur-sm">
-        <h2 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-          <span class="flex size-7 items-center justify-center rounded-lg bg-slate-800 text-teal-400 ring-1 ring-slate-700/80" aria-hidden="true">
-            <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" /></svg>
-          </span>
-          Access
-        </h2>
-        <label for="token" class="block text-xs font-medium text-slate-400 mb-2">
-          Admin token
-          <span class="font-normal text-slate-500"> · optional on <code class="text-slate-400 font-mono text-[0.75rem]">http://127.0.0.1</code></span>
-        </label>
+      <!-- Access Token Section -->
+      <section class="rounded-2xl glass-card p-6 gradient-border">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="flex size-10 items-center justify-center rounded-xl section-icon">
+            <svg class="size-5 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base font-semibold text-white">Access Control</h2>
+            <p class="text-sm text-slate-400">Optional token for remote admin access</p>
+          </div>
+        </div>
+
         <div class="flex flex-col sm:flex-row gap-3">
-          <input type="password" id="token" autocomplete="off" placeholder="FREE_CODEX_ADMIN_TOKEN"
-            class="flex-1 min-w-0 rounded-xl border border-slate-700 bg-slate-950/80 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition ring-0 focus:border-teal-500/60 focus:ring-2 focus:ring-teal-500/20 font-mono" />
-          <div class="flex flex-wrap gap-2">
+          <div class="flex-1">
+            <input type="password" id="token" autocomplete="off" placeholder="FREE_CODEX_ADMIN_TOKEN"
+              class="w-full rounded-xl border border-slate-700/50 bg-slate-950/80 px-4 py-3.5 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition input-glow font-mono" />
+          </div>
+          <div class="flex gap-2">
             <button type="button" id="unlock"
-              class="btn-action inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-100 hover:bg-slate-700 hover:border-slate-500 transition active:scale-[0.98] disabled:opacity-55 disabled:pointer-events-none">
-              <span class="btn-spinner hidden" aria-hidden="true"><svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" aria-hidden="true" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
-              <span class="btn-label">Unlock secrets</span>
+              class="btn-action inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600/50 bg-slate-800/50 px-5 py-3 text-sm font-semibold text-slate-200 hover:bg-slate-700/50 transition">
+              <span class="btn-spinner hidden"><svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
+              <span class="btn-label">Unlock</span>
             </button>
             <button type="button" id="reload"
-              class="btn-action inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-800 transition active:scale-[0.98] disabled:opacity-55 disabled:pointer-events-none">
-              <span class="btn-spinner hidden" aria-hidden="true"><svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" aria-hidden="true" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
-              <span class="btn-label">Reload .env</span>
+              class="btn-action inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700/50 bg-slate-900/50 px-5 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800/50 transition">
+              <span class="btn-spinner hidden"><svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
+              <span class="btn-label">Reload</span>
             </button>
           </div>
         </div>
       </section>
 
-      <section class="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-5 sm:p-6 shadow-glow backdrop-blur-sm">
-        <div class="mb-5">
-          <h2 class="text-sm font-semibold text-white flex items-center gap-2">
-            <span class="flex size-7 items-center justify-center rounded-lg bg-slate-800 text-cyan-400 ring-1 ring-slate-700/80" aria-hidden="true">
-              <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" /></svg>
-            </span>
-            NVIDIA NIM
-          </h2>
-          <p class="mt-2 text-sm text-slate-400 leading-relaxed max-w-3xl">
-            Fields sync from <code class="font-mono text-xs text-slate-300">.env</code> on load. Override here for probes only. Use the same model id as in Codex (e.g. <code class="font-mono text-xs text-teal-200/90">minimaxai/minimax-m2.7</code>).
-          </p>
+      <!-- NVIDIA NIM Configuration -->
+      <section class="rounded-2xl glass-card p-6 gradient-border">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="flex size-10 items-center justify-center rounded-xl section-icon">
+            <svg class="size-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base font-semibold text-white">NVIDIA NIM</h2>
+            <p class="text-sm text-slate-400">Configure your NIM endpoint connection</p>
+          </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
           <label class="block space-y-2">
-            <span class="text-xs font-medium text-slate-400">Base URL</span>
+            <span class="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+              <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+              Base URL
+            </span>
             <input type="text" id="nim-base" placeholder="https://integrate.api.nvidia.com/v1" autocomplete="off"
-              class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-3 text-sm outline-none transition focus:border-teal-500/60 focus:ring-2 focus:ring-teal-500/20 font-mono text-slate-100 placeholder:text-slate-600" />
+              class="w-full rounded-xl border border-slate-700/50 bg-slate-950/80 px-4 py-3.5 text-sm outline-none transition input-glow font-mono text-slate-100 placeholder:text-slate-600" />
           </label>
           <label class="block space-y-2">
-            <span class="text-xs font-medium text-slate-400">API key</span>
-            <input type="password" id="nim-key" placeholder="From .env or override" autocomplete="off"
-              class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-3 text-sm outline-none transition focus:border-teal-500/60 focus:ring-2 focus:ring-teal-500/20 font-mono text-slate-100 placeholder:text-slate-600" />
+            <span class="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+              <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" /></svg>
+              API Key
+            </span>
+            <input type="password" id="nim-key" placeholder="sk-..." autocomplete="off"
+              class="w-full rounded-xl border border-slate-700/50 bg-slate-950/80 px-4 py-3.5 text-sm outline-none transition input-glow font-mono text-slate-100 placeholder:text-slate-600" />
           </label>
           <label class="block space-y-2 md:col-span-2 lg:col-span-1">
-            <span class="text-xs font-medium text-slate-400">Model</span>
+            <span class="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+              <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>
+              Model
+            </span>
             <input type="text" id="nim-model" placeholder="minimaxai/minimax-m2.7" autocomplete="off"
-              class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-3 text-sm outline-none transition focus:border-teal-500/60 focus:ring-2 focus:ring-teal-500/20 font-mono text-slate-100 placeholder:text-slate-600" />
+              class="w-full rounded-xl border border-slate-700/50 bg-slate-950/80 px-4 py-3.5 text-sm outline-none transition input-glow font-mono text-slate-100 placeholder:text-slate-600" />
           </label>
         </div>
-        <div class="mt-5 flex flex-col sm:flex-row flex-wrap gap-3">
+
+        <div class="flex flex-col sm:flex-row gap-3">
           <button type="button" id="nim-list"
-            class="btn-action inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-5 py-2.5 text-sm font-semibold text-slate-100 hover:bg-slate-700 transition active:scale-[0.98] disabled:opacity-55 disabled:pointer-events-none">
-            <span class="btn-spinner hidden" aria-hidden="true"><svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" aria-hidden="true" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
+            class="btn-action inline-flex items-center justify-center gap-2.5 rounded-xl border border-slate-600/50 bg-slate-800/50 px-6 py-3 text-sm font-semibold text-slate-200 hover:bg-slate-700/50 transition">
+            <span class="btn-spinner hidden"><svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
+            <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
             <span class="btn-label inline-flex items-center gap-2">
-              List models
-              <span id="nim-list-count" class="hidden min-h-[1.375rem] items-center justify-center rounded-full bg-violet-500/25 px-2 text-xs font-bold tabular-nums text-violet-100 ring-1 ring-violet-400/35" title="Models returned">0</span>
+              List Models
+              <span id="nim-list-count" class="hidden min-h-[1.5rem] items-center justify-center rounded-full bg-violet-500/25 px-2.5 text-xs font-bold tabular-nums text-violet-100 ring-1 ring-violet-400/30" title="Models returned"></span>
             </span>
           </button>
           <button type="button" id="nim-test"
-            class="btn-action inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-900/30 hover:from-teal-500 hover:to-cyan-500 transition active:scale-[0.98] ring-1 ring-white/10 disabled:opacity-55 disabled:pointer-events-none">
-            <span class="btn-spinner hidden" aria-hidden="true"><svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" aria-hidden="true" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
+            class="btn-action inline-flex items-center justify-center gap-2.5 rounded-xl btn-primary px-6 py-3 text-sm font-semibold text-white">
+            <span class="btn-spinner hidden"><svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
+            <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 1 .024-1.06c-.026-.267.041-.532.12-.784.19-.62.58-1.18 1.14-1.63a4.5 4.5 0 0 1 2.88-1.02A4.5 4.5 0 0 1 15.375 14.1c.018.31.046.612.084.9Z" /></svg>
             <span class="btn-label inline-flex items-center gap-2">
-              Test chat completion
-              <span id="nim-test-status" class="hidden min-h-[1.375rem] items-center justify-center rounded-full px-2.5 text-xs font-bold ring-1" title="Last probe status"></span>
+              Test Chat
+              <span id="nim-test-status" class="hidden min-h-[1.5rem] items-center justify-center rounded-full px-2.5 text-xs font-bold ring-1" title="Last probe status"></span>
             </span>
           </button>
         </div>
       </section>
 
-      <section class="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-5 sm:p-6 shadow-glow backdrop-blur-sm">
-        <h2 class="text-sm font-semibold text-white mb-3">Validation</h2>
-        <pre id="validation" class="validation rounded-xl border border-slate-700/80 bg-slate-950/90 p-4 text-xs font-mono text-slate-300 leading-relaxed whitespace-pre-wrap min-h-[4.5rem]"></pre>
+      <!-- Validation Section -->
+      <section class="rounded-2xl glass-card p-6 gradient-border">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="flex size-10 items-center justify-center rounded-xl section-icon">
+            <svg class="size-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base font-semibold text-white">Configuration Validation</h2>
+            <p class="text-sm text-slate-400">Check your environment setup</p>
+          </div>
+        </div>
+        <pre id="validation" class="rounded-xl border border-slate-700/50 bg-slate-950/80 p-4 text-xs font-mono text-slate-300 leading-relaxed whitespace-pre-wrap min-h-[4rem]"></pre>
       </section>
 
-      <section class="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-5 sm:p-6 shadow-glow backdrop-blur-sm flex flex-col min-h-[320px]">
-        <div class="flex items-center justify-between gap-3 mb-3">
-          <h2 class="text-sm font-semibold text-white">Environment file</h2>
-          <span id="hint" class="text-xs text-slate-500 truncate max-w-[55%] sm:max-w-none text-right"></span>
+      <!-- Environment File Section -->
+      <section class="rounded-2xl glass-card p-6 gradient-border">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div class="flex items-center gap-3">
+            <div class="flex size-10 items-center justify-center rounded-xl section-icon">
+              <svg class="size-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-base font-semibold text-white">Environment File</h2>
+              <p class="text-sm text-slate-400">Edit <code class="font-mono text-xs bg-slate-800 px-1.5 py-0.5 rounded text-teal-300">~/.config/free-codex/.env</code></p>
+            </div>
+          </div>
+          <span id="hint" class="text-xs text-slate-500 max-w-[40%] text-right truncate"></span>
         </div>
+
         <textarea id="env" spellcheck="false"
-          class="flex-1 w-full min-h-[280px] rounded-xl border border-slate-700 bg-slate-950/90 p-4 text-sm font-mono text-slate-200 leading-relaxed resize-y outline-none transition focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/15 placeholder:text-slate-600"></textarea>
+          class="w-full min-h-[280px] rounded-xl border border-slate-700/50 bg-slate-950/90 p-4 text-sm font-mono text-slate-200 leading-relaxed resize-y outline-none transition focus:border-teal-500/50 input-glow placeholder:text-slate-600"></textarea>
+
         <div class="mt-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <button type="button" id="save"
-            class="btn-action inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-900/30 hover:from-teal-500 hover:to-cyan-500 transition active:scale-[0.98] ring-1 ring-white/10 sm:w-auto w-full disabled:opacity-55 disabled:pointer-events-none">
-            <span class="btn-spinner hidden" aria-hidden="true"><svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" aria-hidden="true" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
-            <span class="btn-label">Validate &amp; save .env</span>
+            class="btn-action inline-flex items-center justify-center gap-2.5 rounded-xl btn-primary px-8 py-3.5 text-sm font-semibold text-white">
+            <span class="btn-spinner hidden"><svg class="size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
+            <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a1.125 1.125 0 0 0-.125.13v14.25a.375.375 0 0 0 .375.375h16.5a.375.375 0 0 0 .375-.375v-.083a1.125 1.125 0 0 0-.121-.916l-2.394-2.892a.75.75 0 0 0-.578 0l-2.397 2.897A2.625 2.625 0 0 0 12.018 21H15m-6.75 3h9M12 16.5V3m0 0-3 3m3-3v8.25" /></svg>
+            <span class="btn-label">Save Changes</span>
           </button>
-          <p class="text-xs text-slate-500 leading-relaxed">
-            Restart <code class="font-mono text-slate-400">fc-server</code> after saving so workers reload NVIDIA variables.
+          <p class="text-sm text-slate-500 leading-relaxed">
+            Restart <code class="font-mono text-slate-400">fc-server</code> after saving to apply NVIDIA variables.
           </p>
         </div>
       </section>
+
+      <!-- Footer -->
+      <footer class="text-center py-6 text-sm text-slate-600">
+        <p>Powered by <span class="text-slate-400">Free Codex</span> &middot; <a href="https://github.com/MurShidM01/free-codex" target="_blank" rel="noopener" class="text-slate-500 hover:text-teal-400 transition">GitHub</a></p>
+      </footer>
     </main>
   </div>
 

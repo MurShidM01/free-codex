@@ -6,7 +6,6 @@ import time
 from typing import Any
 
 import httpx
-import httpx
 
 
 def normalize_base_url(url: str) -> str:

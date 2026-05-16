@@ -28,10 +28,11 @@ async def lifespan(app: FastAPI):
         timeout=httpx.Timeout(120.0, connect=10.0),
         limits=httpx.Limits(max_keepalive_connections=32, max_connections=100),
     )
-    logger.info(
-        "Admin UI (local): http://127.0.0.1:%s/admin",
-        settings.server_port,
-    )
+    try:
+        port = settings.server_port
+    except Exception:
+        port = 8080
+    logger.info(f"Admin UI (local): http://127.0.0.1:{port}/admin")
     yield
     await app.state.http_client.aclose()
     logger.info("Stopped Free Codex server.")

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Free Codex — OpenAI-compatible layer for Codex CLI and hosted models"
 readme = "README.md"
 requires-python = ">=3.9"
+license = {text = "MIT"}
 authors = [
     { name = "Free Codex Developer" }
 ]

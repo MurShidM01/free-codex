@@ -7,6 +7,7 @@ from typing import Iterator
 
 
 def sse_chunk_char_size() -> int:
+    """Get SSE chunk size from environment (256-32768)."""
     raw = os.getenv("FREE_CODEX_SSE_DELTA_CHARS", "1536")
     try:
         n = int(raw)
