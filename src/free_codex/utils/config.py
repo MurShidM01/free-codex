@@ -70,5 +70,10 @@ class Settings:
             )
         return val
 
+    def reload(self) -> None:
+        """Reload environment variables from .env file, clearing cache."""
+        self._loaded = False
+        self._cached.clear()
+
 
 settings = Settings()

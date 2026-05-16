@@ -2,12 +2,16 @@
 #
 # Free Codex — NVIDIA NIM via local proxy (fc-server).
 #
-# Use the SAME model id here as NVIDIA_NIM_MODEL in ~/.config/free-codex/.env
-# (e.g. minimaxai/minimax-m2.7) so Codex does not fall back to generic metadata.
+# The model name below should match NVIDIA_NIM_MODEL in your .env file.
+# Run 'fc-init' to set this up automatically.
+# Use 'fc-admin' to configure NVIDIA credentials and model via web UI.
 #
 # NVIDIA credentials live in ~/.config/free-codex/.env (see fc-init / env.example).
 
+# Model ID - must match NVIDIA_NIM_MODEL in ~/.config/free-codex/.env
 model = "minimaxai/minimax-m2.7"
+
+# Provider alias (registered below)
 model_provider = "free_codex_nim"
 
 [model_providers.free_codex_nim]

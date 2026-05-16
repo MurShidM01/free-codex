@@ -64,11 +64,14 @@ async def admin_nim_defaults(request: Request) -> JSONResponse:
             ),
         )
     d = _disk_env()
+    model = (d.get("NVIDIA_NIM_MODEL") or "").strip()
+    if not model:
+        model = "gpt-5.5"
     return JSONResponse(
         {
             "base_url": (d.get("NVIDIA_NIM_BASE_URL") or "").strip(),
             "api_key": (d.get("NVIDIA_NIM_API_KEY") or "").strip(),
-            "model": (d.get("NVIDIA_NIM_MODEL") or "").strip(),
+            "model": model,
         }
     )
 

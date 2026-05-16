@@ -32,14 +32,16 @@ def fc_init() -> None:
     config_dst = free_codex_config_toml()
     env_dst = free_codex_dotenv()
 
+    # Only copy .env template if it doesn't exist
     env_src = package_dir / "config" / "env.example"
-    if env_src.exists():
-        shutil.copy(env_src, env_dst)
-        print(f"Copied .env template to {env_dst}")
-    elif not env_dst.exists():
-        print(
-            f"Warning: No .env found. Create {env_dst} with NVIDIA_NIM_* variables."
-        )
+    env_copied = False
+    if not env_dst.exists():
+        if env_src.exists():
+            shutil.copy(env_src, env_dst)
+            print(f"Copied .env template to {env_dst}")
+            env_copied = True
+    if env_dst.exists() and not env_copied:
+        print(f".env already exists at {env_dst} — skipping .env init.")
 
     if env_dst.exists():
         load_dotenv(dotenv_path=env_dst, override=True)
@@ -48,13 +50,24 @@ def fc_init() -> None:
     if not model_slug:
         model_slug = _FALLBACK_DEFAULT_MODEL
 
-    config_src = package_dir / "config" / "config.toml.example"
-    if config_src.exists():
-        shutil.copy(config_src, config_dst)
-        print(f"Initialized Codex config at {config_dst}")
-    else:
-        config_dst.write_text(_FALLBACK_CODEX_TOML, encoding="utf-8")
-        print(f"Created default Codex config at {config_dst}")
+    # Only initialize config.toml if it doesn't exist
+    config_copied = False
+    if not config_dst.exists():
+        config_src = package_dir / "config" / "config.toml.example"
+        if config_src.exists():
+            shutil.copy(config_src, config_dst)
+            print(f"Initialized Codex config at {config_dst}")
+            config_copied = True
+        else:
+            config_dst.write_text(_FALLBACK_CODEX_TOML, encoding="utf-8")
+            print(f"Created default Codex config at {config_dst}")
+            config_copied = True
+
+    if not config_copied:
+        print(f"config.toml already exists at {config_dst} — skipping config init.")
+        print("To re-initialize, delete the file and run fc-init again.")
+        print(f"Codex will use CODEX_HOME={root.resolve()} when launched via fc-codex.")
+        return
 
     if config_dst.exists():
         raw = config_dst.read_text(encoding="utf-8")

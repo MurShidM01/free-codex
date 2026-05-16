@@ -7,9 +7,72 @@ import errno
 import json
 import logging
 import os
+import datetime
+from pathlib import Path
+from ..utils.free_codex_paths import free_codex_dir
 from typing import Any, AsyncGenerator, AsyncIterable, Callable, Optional
 
 logger = logging.getLogger("free-codex.sse")
+
+
+class UsageTracker:
+    """Simple in-memory token usage tracker."""
+    def __init__(self):
+        self._lock = asyncio.Lock()
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.total_tokens = 0
+        self.requests = 0
+        # Load persisted monthly totals on startup
+        try:
+            db = _load_usage_db()
+            month = datetime.date.today().isoformat()[:7]
+            monthly = db.get("monthly", {}).get(month, {})
+            self.prompt_tokens = monthly.get("prompt_tokens", 0)
+            self.completion_tokens = monthly.get("completion_tokens", 0)
+            self.total_tokens = monthly.get("total_tokens", 0)
+            self.requests = monthly.get("requests", 0)
+        except Exception:
+            pass
+
+    async def add_usage(self, usage):
+        async with self._lock:
+            self.requests += 1
+            if "prompt_tokens" in usage:
+                self.prompt_tokens += usage["prompt_tokens"]
+            if "completion_tokens" in usage:
+                self.completion_tokens += usage["completion_tokens"]
+            if "total_tokens" in usage:
+                self.total_tokens += usage["total_tokens"]
+            if "total_tokens" not in usage and "prompt_tokens" in usage and "completion_tokens" in usage:
+                self.total_tokens += usage["prompt_tokens"] + usage["completion_tokens"]
+            # Persist to DB in background
+            try:
+                record_usage_to_db({
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                })
+            except Exception:
+                pass
+
+    async def get_stats(self):
+        async with self._lock:
+            return {
+                "requests": self.requests,
+                "prompt_tokens": self.prompt_tokens,
+                "completion_tokens": self.completion_tokens,
+                "total_tokens": self.total_tokens,
+            }
+
+    async def reset(self):
+        async with self._lock:
+            self.prompt_tokens = 0
+            self.completion_tokens = 0
+            self.total_tokens = 0
+            self.requests = 0
+
+usage_tracker = UsageTracker()
 
 
 # SSE chunk size configuration
@@ -275,3 +338,206 @@ def is_error_event(event: dict[str, Any]) -> bool:
         if "error" in error_type.lower():
             return True
     return False
+
+
+async def track_usage_and_forward(
+    stream: AsyncGenerator[bytes, None]
+) -> AsyncGenerator[bytes, None]:
+    """Yield chunks unchanged while parsing SSE events to track token usage."""
+    buf = b""
+    async for chunk in stream:
+        if chunk:
+            yield chunk
+            buf += chunk
+            # Process complete events from buffer
+            while True:
+                idx = buf.find(b"\n\n")
+                crlf_idx = buf.find(b"\r\n\r\n")
+                if crlf_idx >= 0 and (idx < 0 or crlf_idx < idx):
+                    pos = crlf_idx
+                    delim_len = 4
+                elif idx >= 0:
+                    pos = idx
+                    delim_len = 2
+                else:
+                    break
+                event_bytes = buf[:pos]
+                buf = buf[pos + delim_len:]
+                if not event_bytes:
+                    continue
+                # Parse event lines for usage
+                for line in event_bytes.split(b"\n"):
+                    if line.startswith(b"\r"):
+                        line = line[1:]
+                    if not line.startswith(b"data: "):
+                        continue
+                    data_str = line[6:].decode("utf-8", errors="replace").strip()
+                    if not data_str or data_str == "[DONE]":
+                        continue
+                    try:
+                        data = json.loads(data_str)
+                        if "usage" in data:
+                            asyncio.create_task(usage_tracker.add_usage(data["usage"]))
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse SSE for usage tracking: {data_str[:100]}")
+                        continue
+        else:
+            yield chunk
+    # Process any remaining data after stream ends
+    if buf:
+        for line in buf.split(b"\n"):
+            if line.startswith(b"\r"):
+                line = line[1:]
+            if not line.startswith(b"data: "):
+                continue
+            data_str = line[6:].decode("utf-8", errors="replace").strip()
+            if not data_str or data_str == "[DONE]":
+                continue
+            try:
+                data = json.loads(data_str)
+                if "usage" in data:
+                    asyncio.create_task(usage_tracker.add_usage(data["usage"]))
+            except json.JSONDecodeError:
+                pass
+
+# Pricing per 1M tokens (from GPT-5.5 docs example)
+PRICING_INPUT = 5.0      # $5 per 1M input tokens
+PRICING_OUTPUT = 30.0    # $30 per 1M output tokens
+PRICING_CACHE_INPUT = 0.5  # $0.5 per 1M cached input tokens
+
+
+def _usage_stats_dir() -> Path:
+    d = free_codex_dir() / "usage_stats"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _usage_db_path() -> Path:
+    return _usage_stats_dir() / "usage.json"
+
+
+def _load_usage_db() -> dict[str, Any]:
+    p = _usage_db_path()
+    if p.exists():
+        try:
+            with p.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {"daily": {}, "monthly": {}, "first_date": None, "last_date": None}
+    return {"daily": {}, "monthly": {}, "first_date": None, "last_date": None}
+
+
+def _save_usage_db(db: dict[str, Any]) -> None:
+    p = _usage_db_path()
+    p.write_text(json.dumps(db, indent=2), encoding="utf-8")
+
+
+def record_usage_to_db(usage: dict[str, int]) -> None:
+    """Persist usage stats by day and month with streak tracking."""
+    try:
+        db = _load_usage_db()
+        today = datetime.date.today().isoformat()
+        month = today[:7]  # YYYY-MM
+
+        # Initialize entries if missing
+        if today not in db.get("daily", {}):
+            db.setdefault("daily", {})[today] = {
+                "requests": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+            }
+        if month not in db.get("monthly", {}):
+            db.setdefault("monthly", {})[month] = {
+                "requests": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+            }
+
+        # Update counters
+        daily = db["daily"][today]
+        monthly = db["monthly"][month]
+        daily["requests"] += 1
+        monthly["requests"] += 1
+        if "prompt_tokens" in usage:
+            pt = usage["prompt_tokens"]
+            daily["prompt_tokens"] += pt
+            monthly["prompt_tokens"] += pt
+        if "completion_tokens" in usage:
+            ct = usage["completion_tokens"]
+            daily["completion_tokens"] += ct
+            monthly["completion_tokens"] += ct
+        if "total_tokens" in usage:
+            tt = usage["total_tokens"]
+            daily["total_tokens"] += tt
+            monthly["total_tokens"] += tt
+        if "total_tokens" not in usage and "prompt_tokens" in usage and "completion_tokens" in usage:
+            daily["total_tokens"] = daily.get("prompt_tokens", 0) + daily.get("completion_tokens", 0)
+            monthly["total_tokens"] = monthly.get("prompt_tokens", 0) + monthly.get("completion_tokens", 0)
+
+        db["last_date"] = today
+        if db.get("first_date") is None:
+            db["first_date"] = today
+
+        _save_usage_db(db)
+    except Exception:
+        pass
+
+
+def get_persistent_stats() -> dict[str, Any]:
+    """Return combined daily, monthly, and streak stats."""
+    db = _load_usage_db()
+    today = datetime.date.today().isoformat()
+    month = today[:7]
+
+    daily = db.get("daily", {}).get(today, {
+        "requests": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+    })
+    monthly = db.get("monthly", {}).get(month, {
+        "requests": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+    })
+
+    # Streak: consecutive days with at least one request
+    streak = 0
+    try:
+        daily_db = db.get("daily", {})
+        d = datetime.date.today()
+        while True:
+            iso = d.isoformat()
+            entry = daily_db.get(iso)
+            if entry and entry.get("requests", 0) > 0:
+                streak += 1
+                d -= datetime.timedelta(days=1)
+            else:
+                break
+    except Exception:
+        streak = 0
+
+    # All-time totals
+    all_ = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    for day_entry in db.get("daily", {}).values():
+        all_["requests"] += day_entry.get("requests", 0)
+        all_["prompt_tokens"] += day_entry.get("prompt_tokens", 0)
+        all_["completion_tokens"] += day_entry.get("completion_tokens", 0)
+        all_["total_tokens"] += day_entry.get("total_tokens", 0)
+
+    # Compute costs using pricing ($/1M tokens)
+    def compute_cost(prompt, completion, total):
+        return (prompt * PRICING_INPUT / 1_000_000) + (completion * PRICING_OUTPUT / 1_000_000)
+
+    return {
+        "all_time": all_,
+        "today": daily,
+        "monthly": monthly,
+        "streak_days": streak,
+        "cost_all_time": compute_cost(all_["prompt_tokens"], all_["completion_tokens"], all_["total_tokens"]),
+        "cost_today": compute_cost(daily["prompt_tokens"], daily["completion_tokens"], daily["total_tokens"]),
+        "cost_monthly": compute_cost(monthly["prompt_tokens"], monthly["completion_tokens"], monthly["total_tokens"]),
+    }

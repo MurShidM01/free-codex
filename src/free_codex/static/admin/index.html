@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="dark" />
   <title>Free Codex — Admin</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+  <link rel="apple-touch-icon" href="/admin/static/icons/codex.svg" />
+  <link rel="icon" type="image/svg+xml" href="/admin/static/icons/free-codex.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -128,8 +129,9 @@
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-4">
             <div class="relative">
-              <div class="flex size-12 items-center justify-center rounded-2xl gradient-border bg-slate-900/80 shadow-lg">
-                <svg class="size-6 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <div class="flex size-12 items-center justify-center rounded-2xl gradient-border bg-slate-900/80 shadow-lg overflow-hidden">
+                <img src="/admin/static/icons/free-codex.svg" alt="Free Codex" class="size-7" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+                <svg class="size-7 text-teal-400 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
                 </svg>
               </div>
@@ -192,6 +194,94 @@
         </div>
       </section>
 
+      <!-- Daily & Monthly Stats -->
+      <section class="rounded-2xl glass-card p-6 gradient-border">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="flex size-10 items-center justify-center rounded-xl section-icon">
+              <svg class="size-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.994C2.648 9.545 3.964 10.75 5.413 10.75h.026c1.474 0 2.906-.453 3.994-1.028A1.013 1.013 0 0 1 9.964 12H5.016a1.013 1.013 0 0 1 0 1.994c.028.574.547 1.028 1.307 1.028h4.303a1.013 1.013 0 0 1 0 1.994H5.413c-1.474 0-2.906.453-3.994 1.028a1.013 1.013 0 0 1-1.307-1.026c0-1.657 2.437-3.004 5.447-3.004h.026c3.01 0 5.447 1.347 5.447 3.004 0 .63-.282 1.204-.795 1.624-.3.247-.626.367-1.003.367-.39 0-.777-.182-1.003-.583-.226-.401-.404-.924-.536-1.565a.375.375 0 0 1 .375-.375c.641 0 1.174.358 1.465.875.291.517.519 1.117.675 1.795.156.678.234 1.366.234 2.061a1.012 1.012 0 0 1-1.007 1.017H7.04a1.012 1.012 0 0 1-1.007-1.017c0-.695.078-1.383.234-2.061.156-.678.384-1.278.675-1.795.291-.517.824-.875 1.465-.875.641 0 1.174.358 1.465.875.156.678.234 1.366.234 2.061a1.012 1.012 0 0 1-1.007 1.017H4.054a1.013 1.013 0 0 1-1.008-1.017c0-1.657 2.437-3.004 5.447-3.004h.026c3.01 0 5.447 1.347 5.447 3.004 0 .63-.282 1.204-.795 1.624a4.5 4.5 0 0 1-.795-1.624 4.5 4.5 0 0 1-.795 1.624c0 1.657 2.437 3.004 5.447 3.004h.026c3.01 0 5.447-1.347 5.447-3.004 0-.63-.282-1.204-.795-1.624a4.5 4.5 0 0 1-.2-.751Zm-5.964 2.965a2.25 2.25 0 0 0 2.205-3.322c0-.603-.278-1.12-.753-1.492-.351-.227-.747-.332-1.167-.332-.42 0-.816.105-1.166.332-.475.372-.753.89-.753 1.492a2.25 2.25 0 0 0 2.205 3.322h-3.87Z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-base font-semibold text-white">Today & Monthly</h2>
+              <p class="text-sm text-slate-400">Daily, monthly, and streak statistics</p>
+            </div>
+          </div>
+          <div class="text-sm text-slate-400 flex items-center gap-2">
+            <div class="flex items-center gap-3">
+              <svg id="refresh-ring" class="size-5 transform -rotate-90" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="8" stroke-opacity="0.2"></circle>
+                <circle id="refresh-progress" cx="12" cy="12" r="8" class="transition-all duration-100 ease-linear" style="stroke-dasharray: 100.53; stroke-dashoffset: 0;"></circle>
+              </svg>
+              <span class="text-xs text-slate-400">Updates in <span id="countdown" class="font-mono text-slate-200">5.0</span>s</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <!-- Streak -->
+          <div class="glass-card rounded-xl p-4 flex flex-col items-center justify-center text-center">
+            <div class="text-xs text-slate-400 mb-1">Current Streak</div>
+            <div class="text-3xl font-mono text-orange-400" id="stat-streak">0</div>
+            <div class="text-xs text-slate-500 mt-1">consecutive days</div>
+          </div>
+          <!-- Today Requests -->
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Today Requests</div>
+            <div class="text-2xl font-mono text-emerald-300" id="stat-today-requests">0</div>
+          </div>
+          <!-- Month Requests -->
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Monthly Requests</div>
+            <div class="text-2xl font-mono text-blue-300" id="stat-month-requests">0</div>
+          </div>
+          <!-- Today Cost -->
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Today Cost</div>
+            <div class="text-2xl font-mono text-amber-300" id="stat-today-cost">$0.000000</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Today Input</div>
+            <div class="text-2xl font-mono text-emerald-300" id="stat-today-prompt">0</div>
+          </div>
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Today Output</div>
+            <div class="text-2xl font-mono text-blue-300" id="stat-today-completion">0</div>
+          </div>
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Today Total</div>
+            <div class="text-2xl font-mono text-violet-300" id="stat-today-total">0</div>
+          </div>
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Avg Tokens/Req</div>
+            <div class="text-2xl font-mono text-cyan-300" id="stat-today-avg-tokens">0</div>
+          </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Month Input</div>
+            <div class="text-2xl font-mono text-emerald-300" id="stat-month-prompt">0</div>
+          </div>
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Month Output</div>
+            <div class="text-2xl font-mono text-blue-300" id="stat-month-completion">0</div>
+          </div>
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Month Total</div>
+            <div class="text-2xl font-mono text-violet-300" id="stat-month-total">0</div>
+          </div>
+          <div class="glass-card rounded-xl p-4">
+            <div class="text-xs text-slate-400">Month Cost</div>
+            <div class="text-2xl font-mono text-amber-300" id="stat-month-cost">$0.000000</div>
+          </div>
+        </div>
+      </section>
+
       <!-- NVIDIA NIM Configuration -->
       <section class="rounded-2xl glass-card p-6 gradient-border">
         <div class="flex items-center gap-3 mb-5">
@@ -228,7 +318,7 @@
               <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>
               Model
             </span>
-            <input type="text" id="nim-model" placeholder="minimaxai/minimax-m2.7" autocomplete="off"
+            <input type="text" id="nim-model" placeholder="gpt-5.5" autocomplete="off"
               class="w-full rounded-xl border border-slate-700/50 bg-slate-950/80 px-4 py-3.5 text-sm outline-none transition input-glow font-mono text-slate-100 placeholder:text-slate-600" />
           </label>
         </div>
@@ -253,25 +343,7 @@
             </span>
           </button>
         </div>
-      </section>
-
-      <!-- Validation Section -->
-      <section class="rounded-2xl glass-card p-6 gradient-border">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="flex size-10 items-center justify-center rounded-xl section-icon">
-            <svg class="size-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-base font-semibold text-white">Configuration Validation</h2>
-            <p class="text-sm text-slate-400">Check your environment setup</p>
-          </div>
-        </div>
-        <pre id="validation" class="rounded-xl border border-slate-700/50 bg-slate-950/80 p-4 text-xs font-mono text-slate-300 leading-relaxed whitespace-pre-wrap min-h-[4rem]"></pre>
-      </section>
-
-      <!-- Environment File Section -->
+      </section><!-- Environment File Section -->
       <section class="rounded-2xl glass-card p-6 gradient-border">
         <div class="flex items-center justify-between gap-3 mb-4">
           <div class="flex items-center gap-3">
@@ -291,6 +363,8 @@
         <textarea id="env" spellcheck="false"
           class="w-full min-h-[280px] rounded-xl border border-slate-700/50 bg-slate-950/90 p-4 text-sm font-mono text-slate-200 leading-relaxed resize-y outline-none transition focus:border-teal-500/50 input-glow placeholder:text-slate-600"></textarea>
 
+        <div id="validation" class="mt-4 rounded-xl border border-slate-700/50 bg-slate-950/90 p-4 text-xs font-mono text-slate-300 leading-relaxed whitespace-pre-wrap break-words"></div>
+
         <div class="mt-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <button type="button" id="save"
             class="btn-action inline-flex items-center justify-center gap-2.5 rounded-xl btn-primary px-8 py-3.5 text-sm font-semibold text-white">
@@ -305,8 +379,15 @@
       </section>
 
       <!-- Footer -->
-      <footer class="text-center py-6 text-sm text-slate-600">
-        <p>Powered by <span class="text-slate-400">Free Codex</span> &middot; <a href="https://github.com/MurShidM01/free-codex" target="_blank" rel="noopener" class="text-slate-500 hover:text-teal-400 transition">GitHub</a></p>
+      <footer class="text-center py-6 space-y-3">
+        <div class="flex items-center justify-center gap-2">
+          <span class="text-sm text-slate-600">Powered by</span>
+          <a href="https://github.com/MurShidM01/free-codex" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-teal-400 transition">
+            <img src="/admin/static/icons/codex.svg" alt="Codex" class="size-4" />
+            <span class="text-slate-400">Free Codex</span>
+          </a>
+        </div>
+        <a href="https://github.com/MurShidM01/free-codex" target="_blank" rel="noopener" class="block text-sm text-slate-600 hover:text-teal-400 transition">GitHub</a>
       </footer>
     </main>
   </div>
@@ -314,3 +395,6 @@
   <script src="/admin/static/app.js"></script>
 </body>
 </html>
+
+
+

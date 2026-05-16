@@ -7,6 +7,8 @@ const BANNER_ERR =
 
 const LIST_COUNT_OK =
   "inline-flex min-h-[1.375rem] items-center justify-center rounded-full bg-violet-500/25 px-2 text-xs font-bold tabular-nums text-violet-100 ring-1 ring-violet-400/35";
+const RING_RADIUS = 8;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS; // ≈ 50.27
 
 const TEST_WORKING =
   "inline-flex min-h-[1.375rem] items-center justify-center rounded-full bg-emerald-500/25 px-2.5 text-xs font-bold text-emerald-100 ring-1 ring-emerald-400/40";
@@ -246,6 +248,7 @@ function nimPayload() {
 
 function setValidationStyle(ok) {
   const v = $("validation");
+  if (!v) return;
   v.classList.remove(
     "border-emerald-500/40",
     "border-red-500/45",
@@ -261,8 +264,10 @@ async function loadEnv() {
     const data = await fetchJSON("/admin/api/env");
     $("env").value = data.content || "";
     const lines = (data.validation_errors || []).join("\n") || "(none)";
-    $("validation").textContent =
-      `validation_ok: ${data.validation_ok}\n${lines}`;
+    const validation = $("validation");
+    if (validation) {
+      validation.textContent = `validation_ok: ${data.validation_ok}\n${lines}`;
+    }
     setValidationStyle(data.validation_ok);
     if (data.masked) {
       showBanner(
@@ -340,3 +345,98 @@ $("nim-list").addEventListener("click", nimListModels);
 $("nim-test").addEventListener("click", nimTestChat);
 
 loadEnv();
+
+// Usage statistics polling
+async function loadUsageStats() {
+  try {
+    const data = await fetchJSON("/admin/api/usage");
+
+    // Use today & monthly + streak + costs from backend
+    const today = data.today || {};
+    const monthly = data.monthly || {};
+
+    // Today stats
+    const todayReqs = today.requests ?? 0;
+    $("stat-today-requests").textContent = formatNumber(todayReqs);
+    $("stat-today-prompt").textContent = formatNumber(today.prompt_tokens ?? 0);
+    $("stat-today-completion").textContent = formatNumber(today.completion_tokens ?? 0);
+    $("stat-today-total").textContent = formatNumber(today.total_tokens ?? 0);
+    const cToday = data.cost_today ?? ((today.prompt_tokens ?? 0) * 5 / 1e6 + (today.completion_tokens ?? 0) * 30 / 1e6);
+    $("stat-today-cost").textContent = "$" + cToday.toFixed(6);
+    // Avg tokens per request
+    const avgTokens = todayReqs > 0 ? Math.round((today.total_tokens ?? 0) / todayReqs) : 0;
+    $("stat-today-avg-tokens").textContent = formatNumber(avgTokens);
+
+    // Monthly stats
+    $("stat-month-requests").textContent = formatNumber(monthly.requests ?? 0);
+    $("stat-month-prompt").textContent = formatNumber(monthly.prompt_tokens ?? 0);
+    $("stat-month-completion").textContent = formatNumber(monthly.completion_tokens ?? 0);
+    $("stat-month-total").textContent = formatNumber(monthly.total_tokens ?? 0);
+    const cMonth = data.cost_monthly ?? ((monthly.prompt_tokens ?? 0) * 5 / 1e6 + (monthly.completion_tokens ?? 0) * 30 / 1e6);
+    $("stat-month-cost").textContent = "$" + cMonth.toFixed(6);
+
+    // Streak
+    if (data.streak_days !== undefined) {
+      $("stat-streak").textContent = data.streak_days + " day" + (data.streak_days === 1 ? '' : 's');
+      $("stat-streak").title = `Current streak: ${data.streak_days} consecutive days with usage`;
+    }
+
+    // Reset countdown timer on successful refresh
+    resetRefreshTimer();
+  } catch (e) {
+    console.error("Failed to load usage stats:", e);
+  }
+}
+
+// Poll every 5 seconds
+let refreshInterval = 5000; // ms
+let lastRefresh = Date.now();
+function updateCountdownRing() {
+  const now = Date.now();
+  const elapsed = now - lastRefresh;
+  const remaining = Math.max(0, refreshInterval - elapsed);
+  const progress = elapsed / refreshInterval; // 0 to 1
+  // Countdown: ring starts FULL and empties as time passes
+  const offset = RING_CIRCUMFERENCE * progress; // Starts at 0 (full), goes to full (empty)
+  const ring = $("refresh-progress");
+  const countdown = $("countdown");
+  if (ring) {
+    ring.style.strokeDasharray = RING_CIRCUMFERENCE;
+    ring.style.strokeDashoffset = offset;
+    // Color gradient: green → yellow → red as time passes
+    if (progress < 0.5) {
+      ring.setAttribute("stroke", "#22c55e"); // green-500
+    } else if (progress < 0.8) {
+      ring.setAttribute("stroke", "#eab308"); // yellow-500
+    } else {
+      ring.setAttribute("stroke", "#ef4444"); // red-500
+    }
+  }
+  if (countdown) {
+    countdown.textContent = (remaining / 1000).toFixed(1);
+  }
+}
+function tick() {
+  updateCountdownRing();
+}
+function startCountdownTimer() {
+  setInterval(tick, 100);
+}
+function resetRefreshTimer() {
+  lastRefresh = Date.now();
+}
+let pollHandle = setInterval(() => {
+  loadUsageStats();
+  resetRefreshTimer();
+}, refreshInterval);
+startCountdownTimer();
+// Initial load after a short delay
+setTimeout(() => { loadUsageStats(); resetRefreshTimer(); tick(); }, 2000);
+
+// Token formatter: 1.2M, 1.5B, etc
+function formatNumber(num) {
+  if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(2) + 'B';
+  if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + 'M';
+  if (num >= 1_000) return (num / 1_000).toFixed(1) + 'K';
+  return num.toLocaleString();
+}

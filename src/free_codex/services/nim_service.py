@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, AsyncGenerator, Dict
@@ -15,6 +16,8 @@ from .sse_utils import (
     sse_disconnect_safe,
     sse_with_heartbeat,
     yield_error_sse,
+    track_usage_and_forward,
+    usage_tracker,
 )
 
 logger = logging.getLogger("free-codex.nim")
@@ -35,10 +38,19 @@ class NIMService:
         }
 
     def _get_actual_model(self, requested_model: str) -> str:
-        """Resolve requested model to configured NIM model."""
-        if requested_model in ["nvidia_nim", "gpt-4", "gpt-4o", "gpt-3.5-turbo", ""]:
-            return settings.nim_model
-        return requested_model or settings.nim_model
+        """Resolve requested model to configured NIM model.
+
+        Always use the configured NVIDIA_NIM_MODEL from settings.
+        This allows config.toml to request any model name while
+        ensuring we use the model configured in .env.
+        """
+        configured = settings.nim_model
+        if not configured:
+            raise HTTPException(
+                status_code=500,
+                detail="NVIDIA_NIM_MODEL not configured in .env",
+            )
+        return configured
 
     def _validate_response(self, response: httpx.Response) -> None:
         """Validate NIM response, raising HTTPException for errors."""
@@ -60,7 +72,9 @@ class NIMService:
         )
 
         self._validate_response(response)
-        return response.json()
+        data = response.json()
+        asyncio.create_task(usage_tracker.add_usage(data.get("usage", {})))
+        return data
 
     async def stream_chat_completion(
         self, request: ChatCompletionRequest
@@ -87,8 +101,10 @@ class NIMService:
                     yield b"data: [DONE]\n\n"
                     return
 
-                # Stream the response with disconnect safety
-                async for chunk in sse_disconnect_safe(response.aiter_bytes()):
+                # Stream the response with disconnect safety and usage tracking
+                async for chunk in track_usage_and_forward(
+                    sse_disconnect_safe(response.aiter_bytes())
+                ):
                     if chunk:
                         yield chunk
 
@@ -122,7 +138,9 @@ class NIMService:
         )
 
         self._validate_response(response)
-        return response.json()
+        data = response.json()
+        asyncio.create_task(usage_tracker.add_usage(data.get("usage", {})))
+        return data
 
     async def stream_completion(
         self, request: CompletionRequest
@@ -149,7 +167,10 @@ class NIMService:
                     yield b"data: [DONE]\n\n"
                     return
 
-                async for chunk in sse_disconnect_safe(response.aiter_bytes()):
+                # Stream with disconnect safety and usage tracking
+                async for chunk in track_usage_and_forward(
+                    sse_disconnect_safe(response.aiter_bytes())
+                ):
                     if chunk:
                         yield chunk
 
@@ -185,7 +206,9 @@ class NIMService:
         )
 
         self._validate_response(response)
-        return response.json()
+        data = response.json()
+        asyncio.create_task(usage_tracker.add_usage(data.get("usage", {})))
+        return data
 
     async def stream_chat_completions_payload(
         self, payload: Dict[str, Any]
@@ -213,7 +236,10 @@ class NIMService:
                     yield b"data: [DONE]\n\n"
                     return
 
-                async for chunk in sse_disconnect_safe(response.aiter_bytes()):
+                # Stream with disconnect safety and usage tracking
+                async for chunk in track_usage_and_forward(
+                    sse_disconnect_safe(response.aiter_bytes())
+                ):
                     if chunk:
                         yield chunk
 

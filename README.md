@@ -2,12 +2,9 @@
 
 <p align="center">
 
-<<<<<<< HEAD
 [![GitHub Stars](https://img.shields.io/github/stars/MurShidM01/free-codex?style=social)](https://github.com/MurShidM01/free-codex/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/MurShidM01/free-codex?style=social)](https://github.com/MurShidM01/free-codex/network/members)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
-=======
->>>>>>> 32a235326d2e5e583bdd23a638123b1cd96de6ee
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/badge/package%20manager-uv-465fff?logo=uv&logoColor=white)](https://github.com/astral-sh/uv)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -28,12 +25,13 @@ A lightweight, self-hosted API layer that brings Codex tooling to NVIDIA NIM and
 
 | | |
 |--|--|
-| **OpenAI-Compatible API** | `/v1/chat/completions`, `/v1/models`, `/v1/responses` endpoints |
+| **OpenAI-Compatible API** | `/v1/chat/completions`, `/v1/models`, `/v1/completions` endpoints |
 | **Any Provider** | NVIDIA NIM, Ollama, vLLM, LM Studio, or any OpenAI-compatible API |
 | **Codex Tool Support** | Full tool-calling (functions) and workspace context |
-| **Beautiful Admin UI** | Web console at `/admin` for configuration and testing |
-| **Model Alignment** | Automatic model ID matching between Codex and your provider |
-| **Live Reload** | Instant Python + UI refresh during development |
+| **Beautiful Admin UI** | Web console at `/admin` for configuration, testing, and monitoring |
+| **Model Alignment** | Automatic model ID matching — just set `NVIDIA_NIM_MODEL` in `.env` |
+| **Live Reload** | Instant config refresh without restart |
+| **Usage Statistics** | Real-time tracking of requests, tokens, and costs |
 | **Cross-Platform** | Linux, macOS, and Windows (with SSE error handling) |
 
 ---
@@ -50,7 +48,7 @@ uv tool install git+https://github.com/MurShidM01/free-codex.git
 uv tool install git+https://github.com/MurShidM01/free-codex.git --force
 ```
 
-> **Note:** After installing via `uv tool`, run `fc-init` once to create your config files.
+> **Note:** After installing, run `fc-init` once to create your config files.
 
 ### Development Install
 
@@ -91,7 +89,7 @@ fc-init
 ```
 
 This creates `~/.config/free-codex/` with:
-- `config.toml` — Codex configuration
+- `config.toml` — Codex configuration (uses `minimaxai/minimax-m2.7` by default)
 - `.env` — Your credentials (edit this)
 
 ### 3. Configure Your Provider
@@ -101,10 +99,13 @@ Edit `~/.config/free-codex/.env`:
 ```env
 NVIDIA_NIM_BASE_URL=https://integrate.api.nvidia.com/v1
 NVIDIA_NIM_API_KEY=your_api_key_here
-NVIDIA_NIM_MODEL=meta/llama-3.1-70b-instruct
+NVIDIA_NIM_MODEL=minimaxai/minimax-m2.7
 ```
 
-> **Tip:** Open `http://127.0.0.1:8080/admin` for a visual editor.
+> **Tip:** Open `http://127.0.0.1:8080/admin` for a visual editor with:
+> - NIM endpoint testing (List Models, Test Chat)
+> - Usage statistics (requests, tokens, costs)
+> - Environment file editor with validation
 
 ### 4. Start the Server
 
@@ -146,7 +147,7 @@ fc-codex
 |----------|---------|-------------|
 | `NVIDIA_NIM_BASE_URL` | — | Provider base URL (required) |
 | `NVIDIA_NIM_API_KEY` | — | API key (required) |
-| `NVIDIA_NIM_MODEL` | — | Default model ID |
+| `NVIDIA_NIM_MODEL` | — | Default model ID (required) |
 | `FREE_CODEX_PORT` | `8080` | Server port |
 | `FREE_CODEX_HOST` | `0.0.0.0` | Bind address |
 | `FREE_CODEX_RELOAD` | `0` | Enable auto-reload (`1`/`true`/`on`) |
@@ -165,9 +166,10 @@ fc-codex
 
 | Command | Description |
 |---------|-------------|
-| `fc-init` | Initialize `~/.config/free-codex/` |
+| `fc-init` | Initialize `~/.config/free-codex/` (safe — won't overwrite existing config) |
 | `fc-server` | Start the API proxy server |
 | `fc-codex` | Launch Codex CLI with Free Codex config |
+| `fc-admin` | Open admin dashboard in browser |
 
 ---
 
@@ -183,6 +185,13 @@ fc-codex
 └──────────────┘     └─────────────────┘     │  vLLM           │
                                               └─────────────────┘
 ```
+
+### How Model Selection Works
+
+1. Set `NVIDIA_NIM_MODEL` in `~/.config/free-codex/.env`
+2. Free Codex **always** routes requests to the configured model
+3. The `model` in `config.toml` can be any string — it's overridden by `NVIDIA_NIM_MODEL`
+4. Use the Admin UI to test your connection before running Codex
 
 ---
 
@@ -220,6 +229,20 @@ FREE_CODEX_RELOAD=1 uv run fc-server
 2. Edit `~/.config/free-codex/.env` with your credentials
 3. Restart `fc-server`
 
+### Admin UI shows "Authentication failed" when testing?
+
+1. Open `http://127.0.0.1:8080/admin` (not a different IP)
+2. The admin panel auto-unlocks from localhost
+3. Or set `FREE_CODEX_ADMIN_TOKEN` in `.env`
+
+### How do I change the model?
+
+Edit `~/.config/free-codex/.env`:
+```env
+NVIDIA_NIM_MODEL=your-model-id
+```
+Then restart `fc-server` (or save via Admin UI which auto-reloads).
+
 ### Windows SSE errors on close?
 
 Benign `WinError 10054` on SSE client disconnect is filtered — safe to ignore.
@@ -251,7 +274,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 <p align="center">
 
-<<<<<<< HEAD
 **Built with**
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -266,12 +288,3 @@ MIT License — see [LICENSE](LICENSE) for details.
 [Discussions](https://github.com/MurShidM01/free-codex/discussions)
 
 </p>
-=======
-<p align="center">
-  <a href="https://github.com/MurShidM01/free-codex">GitHub</a>
-  ·
-  <a href="https://github.com/MurShidM01/free-codex/issues">Issues</a>
-  ·
-  <a href="https://github.com/MurShidM01/free-codex/discussions">Discussions</a>
-</p>
->>>>>>> 32a235326d2e5e583bdd23a638123b1cd96de6ee

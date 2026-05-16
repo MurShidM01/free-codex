@@ -45,16 +45,16 @@ async def create_response(
 
     # Check if streaming is requested
     if payload.get("stream"):
-        # For streaming, we still call non-streaming NIM and convert to SSE
+        # For streaming, we use a non-streaming NIM call and convert the result to SSE
         # This ensures compatibility with NIM endpoints that don't support streaming
         buf = dict(payload)
         buf["stream"] = False
-
-        # Start streaming SSE response
+        # Actually call the NIM API (non-streaming) to get the completion
+        completion = await nim_service.post_chat_completions_payload(buf)
         return StreamingResponse(
             sse_disconnect_safe(
                 minimal_sse_from_completion(
-                    completion=buf,
+                    completion=completion,
                     resp_id=resp_id,
                     msg_id=msg_id,
                     displayed_model=display_model,
