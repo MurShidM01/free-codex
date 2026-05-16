@@ -89,8 +89,24 @@ def create_app() -> FastAPI:
         name="admin_static",
     )
 
-    @app.get("/health")
+    # Mount root static files for health page
+    static_root = Path(__file__).resolve().parent / "static"
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(static_root)),
+        name="root_static",
+    )
+
+    @app.get("/health", include_in_schema=False)
+    async def health_page():
+        """Serve the health/status dashboard page."""
+        index = Path(__file__).resolve().parent / "static" / "index.html"
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(index.read_text(encoding="utf-8"))
+
+    @app.get("/health/json")
     async def health_check():
+        """JSON health check for monitoring."""
         return {"status": "healthy"}
-        
+
     return app
