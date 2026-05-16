@@ -105,6 +105,35 @@ Access the web-based admin panel at `http://127.0.0.1:8080/admin`:
 - View usage statistics (requests, tokens, costs)
 - Edit environment variables with validation
 - Monitor streak days and daily/monthly stats
+- Animated stat counters with real-time updates
+
+---
+
+## Advanced Configuration
+
+### Timeout & Retry Settings
+
+For complex tasks, long files, or slow endpoints:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FREE_CODEX_READ_TIMEOUT` | `180` | Response timeout in seconds |
+| `FREE_CODEX_CONNECT_TIMEOUT` | `30` | Connection timeout in seconds |
+| `FREE_CODEX_MAX_RETRIES` | `2` | Retries on transient errors |
+
+```env
+# For long files or complex agents (5 minute timeout)
+FREE_CODEX_READ_TIMEOUT=300
+FREE_CODEX_CONNECT_TIMEOUT=60
+FREE_CODEX_MAX_RETRIES=3
+```
+
+### Workspace Context Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FREE_CODEX_WORKSPACE_SNIPPET_BYTES` | `49152` | Max bytes per file snippet |
+| `FREE_CODEX_WORKSPACE_SNIPPET_LINES` | `160` | Max lines per file snippet |
 
 ---
 

@@ -44,6 +44,51 @@ class Settings:
         return v.lower() in ("1", "true", "yes")
 
     @property
+    def read_timeout(self) -> int:
+        """Timeout for API responses in seconds."""
+        raw = self._get_env("FREE_CODEX_READ_TIMEOUT", required=False)
+        try:
+            return int(raw) if raw else 180
+        except ValueError:
+            return 180
+
+    @property
+    def connect_timeout(self) -> int:
+        """Timeout for connections in seconds."""
+        raw = self._get_env("FREE_CODEX_CONNECT_TIMEOUT", required=False)
+        try:
+            return int(raw) if raw else 30
+        except ValueError:
+            return 30
+
+    @property
+    def max_retries(self) -> int:
+        """Max retries on transient errors."""
+        raw = self._get_env("FREE_CODEX_MAX_RETRIES", required=False)
+        try:
+            return int(raw) if raw else 2
+        except ValueError:
+            return 2
+
+    @property
+    def workspace_snippet_bytes(self) -> int:
+        """Max bytes per snippet for workspace context."""
+        raw = self._get_env("FREE_CODEX_WORKSPACE_SNIPPET_BYTES", required=False)
+        try:
+            return int(raw) if raw else 49152
+        except ValueError:
+            return 49152
+
+    @property
+    def workspace_snippet_lines(self) -> int:
+        """Max lines per snippet for workspace context."""
+        raw = self._get_env("FREE_CODEX_WORKSPACE_SNIPPET_LINES", required=False)
+        try:
+            return int(raw) if raw else 160
+        except ValueError:
+            return 160
+
+    @property
     def nim_base_url(self) -> str:
         val = self._get_env("NVIDIA_NIM_BASE_URL", required=False)
         if not val:
