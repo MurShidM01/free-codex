@@ -21,11 +21,24 @@ from .utils.config import settings
 
 install_asyncio_noise_filter()
 
+
+class RequestIdFormatter(logging.Formatter):
+    """Formatter that provides a default for request_id when not present."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        if not hasattr(record, "request_id"):
+            record.request_id = "-"
+        return super().format(record)
+
+
 _lvl = os.getenv("FREE_CODEX_LOG_LEVEL", "INFO").upper()
-logging.basicConfig(
-    level=getattr(logging, _lvl, logging.INFO),
-    format="%(asctime)s - %(name)s - [%(request_id)s] - %(levelname)s - %(message)s"
+_handler = logging.StreamHandler()
+_handler.setFormatter(
+    RequestIdFormatter(
+        fmt="%(asctime)s - %(name)s - [%(request_id)s] - %(levelname)s - %(message)s"
+    )
 )
+logging.basicConfig(level=getattr(logging, _lvl, logging.INFO), handlers=[_handler])
 logger = logging.getLogger("free-codex")
 
 
