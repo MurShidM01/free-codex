@@ -1,0 +1,18 @@
+#:schema https://developers.openai.com/codex/config-schema.json
+#
+# Free Codex — NVIDIA NIM via local proxy (fc-server).
+#
+# Use the SAME model id here as NVIDIA_NIM_MODEL in ~/.config/free-codex/.env
+# (e.g. minimaxai/minimax-m2.7) so Codex does not fall back to generic metadata.
+#
+# NVIDIA credentials live in ~/.config/free-codex/.env (see fc-init / env.example).
+
+model = "minimaxai/minimax-m2.7"
+model_provider = "free_codex_nim"
+
+[model_providers.free_codex_nim]
+name = "Free Codex (local NIM proxy)"
+base_url = "http://127.0.0.1:8080/v1"
+
+[windows]
+sandbox = "elevated"

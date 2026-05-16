@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Free Codex — Admin</title>
+  <link rel="stylesheet" href="/admin/static/styles.css" />
+</head>
+<body>
+  <header class="top">
+    <h1>Free Codex Admin</h1>
+    <p class="sub">Manage <code>~/.config/free-codex/.env</code> • NVIDIA NIM • API checks</p>
+  </header>
+
+  <main class="panel">
+    <section class="row">
+      <div id="banner" class="banner" hidden></div>
+    </section>
+
+    <section class="row controls">
+      <label>Admin token <span class="hint">(optional on <code>http://127.0.0.1</code> — required from other hosts)</span></label>
+      <div class="inline">
+        <input type="password" id="token" autocomplete="off" placeholder="FREE_CODEX_ADMIN_TOKEN" />
+        <button type="button" id="unlock">Unlock secrets</button>
+        <button type="button" id="reload">Reload .env</button>
+      </div>
+    </section>
+
+    <section class="row nim-panel">
+      <h2 class="section-title">NVIDIA API</h2>
+      <p class="hint">Overrides below fall back to unlocked .env values. Use the same model id as in Codex config (e.g. <code>minimaxai/minimax-m2.7</code>).</p>
+      <div class="nim-grid">
+        <label>Base URL <input type="text" id="nim-base" placeholder="https://integrate.api.nvidia.com/v1" autocomplete="off" /></label>
+        <label>API key <input type="password" id="nim-key" placeholder="optional override" autocomplete="off" /></label>
+        <label>Model <input type="text" id="nim-model" placeholder="minimaxai/minimax-m2.7" autocomplete="off" /></label>
+      </div>
+      <div class="inline nim-actions">
+        <button type="button" id="nim-list">List models (count)</button>
+        <button type="button" id="nim-test" class="primary">Test chat completion</button>
+      </div>
+      <pre id="nim-result" class="validation nim-result"></pre>
+    </section>
+
+    <section class="row">
+      <label>.env validation</label>
+      <pre id="validation" class="validation"></pre>
+    </section>
+
+    <section class="row grow">
+      <label>.env contents</label>
+      <textarea id="env" spellcheck="false"></textarea>
+    </section>
+
+    <section class="row actions">
+      <button type="button" id="save" class="primary">Validate &amp; save .env</button>
+      <span id="hint" class="hint"></span>
+    </section>
+  </main>
+
+  <script src="/admin/static/app.js"></script>
+</body>
+</html>
