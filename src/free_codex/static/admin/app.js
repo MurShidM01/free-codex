@@ -346,6 +346,43 @@ $("nim-test").addEventListener("click", nimTestChat);
 
 loadEnv();
 
+// Animated number counter
+function animateValue(element, start, end, duration, isCurrency = false, decimals = 0) {
+  if (!element) return;
+
+  // Trigger glow animation
+  element.classList.add('stat-value', 'updating-glow');
+
+  const startTime = performance.now();
+  const diff = end - start;
+
+  function update(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    // Ease out cubic for smooth deceleration
+    const easeOut = 1 - Math.pow(1 - progress, 3);
+    const current = start + (diff * easeOut);
+
+    if (isCurrency) {
+      element.textContent = "$" + current.toFixed(decimals);
+    } else {
+      element.textContent = formatNumber(Math.round(current));
+    }
+
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    } else {
+      // Remove animation class when complete
+      element.classList.remove('updating-glow');
+    }
+  }
+
+  requestAnimationFrame(update);
+}
+
+// Track previous values for animation
+const previousValues = {};
+
 // Usage statistics polling
 async function loadUsageStats() {
   try {
@@ -355,29 +392,43 @@ async function loadUsageStats() {
     const today = data.today || {};
     const monthly = data.monthly || {};
 
-    // Today stats
+    // Today stats with animation
     const todayReqs = today.requests ?? 0;
-    $("stat-today-requests").textContent = formatNumber(todayReqs);
-    $("stat-today-prompt").textContent = formatNumber(today.prompt_tokens ?? 0);
-    $("stat-today-completion").textContent = formatNumber(today.completion_tokens ?? 0);
-    $("stat-today-total").textContent = formatNumber(today.total_tokens ?? 0);
+    animateValue($("stat-today-requests"), previousValues.todayRequests ?? 0, todayReqs, 600);
+    animateValue($("stat-today-prompt"), previousValues.todayPrompt ?? 0, today.prompt_tokens ?? 0, 600);
+    animateValue($("stat-today-completion"), previousValues.todayCompletion ?? 0, today.completion_tokens ?? 0, 600);
+    animateValue($("stat-today-total"), previousValues.todayTotal ?? 0, today.total_tokens ?? 0, 600);
     const cToday = data.cost_today ?? ((today.prompt_tokens ?? 0) * 5 / 1e6 + (today.completion_tokens ?? 0) * 30 / 1e6);
-    $("stat-today-cost").textContent = "$" + cToday.toFixed(6);
+    animateValue($("stat-today-cost"), previousValues.todayCost ?? 0, cToday, 600, true, 6);
     // Avg tokens per request
     const avgTokens = todayReqs > 0 ? Math.round((today.total_tokens ?? 0) / todayReqs) : 0;
-    $("stat-today-avg-tokens").textContent = formatNumber(avgTokens);
+    animateValue($("stat-today-avg-tokens"), previousValues.todayAvgTokens ?? 0, avgTokens, 600);
 
-    // Monthly stats
-    $("stat-month-requests").textContent = formatNumber(monthly.requests ?? 0);
-    $("stat-month-prompt").textContent = formatNumber(monthly.prompt_tokens ?? 0);
-    $("stat-month-completion").textContent = formatNumber(monthly.completion_tokens ?? 0);
-    $("stat-month-total").textContent = formatNumber(monthly.total_tokens ?? 0);
+    // Monthly stats with animation
+    animateValue($("stat-month-requests"), previousValues.monthRequests ?? 0, monthly.requests ?? 0, 600);
+    animateValue($("stat-month-prompt"), previousValues.monthPrompt ?? 0, monthly.prompt_tokens ?? 0, 600);
+    animateValue($("stat-month-completion"), previousValues.monthCompletion ?? 0, monthly.completion_tokens ?? 0, 600);
+    animateValue($("stat-month-total"), previousValues.monthTotal ?? 0, monthly.total_tokens ?? 0, 600);
     const cMonth = data.cost_monthly ?? ((monthly.prompt_tokens ?? 0) * 5 / 1e6 + (monthly.completion_tokens ?? 0) * 30 / 1e6);
-    $("stat-month-cost").textContent = "$" + cMonth.toFixed(6);
+    animateValue($("stat-month-cost"), previousValues.monthCost ?? 0, cMonth, 600, true, 6);
 
-    // Streak
+    // Store previous values
+    previousValues.todayRequests = todayReqs;
+    previousValues.todayPrompt = today.prompt_tokens ?? 0;
+    previousValues.todayCompletion = today.completion_tokens ?? 0;
+    previousValues.todayTotal = today.total_tokens ?? 0;
+    previousValues.todayCost = cToday;
+    previousValues.todayAvgTokens = avgTokens;
+    previousValues.monthRequests = monthly.requests ?? 0;
+    previousValues.monthPrompt = monthly.prompt_tokens ?? 0;
+    previousValues.monthCompletion = monthly.completion_tokens ?? 0;
+    previousValues.monthTotal = monthly.total_tokens ?? 0;
+    previousValues.monthCost = cMonth;
+
+    // Streak (no animation for single value)
     if (data.streak_days !== undefined) {
-      $("stat-streak").textContent = data.streak_days + " day" + (data.streak_days === 1 ? '' : 's');
+      const streakText = data.streak_days + " day" + (data.streak_days === 1 ? '' : 's');
+      $("stat-streak").textContent = streakText;
       $("stat-streak").title = `Current streak: ${data.streak_days} consecutive days with usage`;
     }
 
