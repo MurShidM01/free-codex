@@ -2,9 +2,12 @@
 
 <p align="center">
 
+<<<<<<< HEAD
 [![GitHub Stars](https://img.shields.io/github/stars/MurShidM01/free-codex?style=social)](https://github.com/MurShidM01/free-codex/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/MurShidM01/free-codex?style=social)](https://github.com/MurShidM01/free-codex/network/members)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+=======
+>>>>>>> 32a235326d2e5e583bdd23a638123b1cd96de6ee
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/badge/package%20manager-uv-465fff?logo=uv&logoColor=white)](https://github.com/astral-sh/uv)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -248,6 +251,7 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 <p align="center">
 
+<<<<<<< HEAD
 **Built with**
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -262,3 +266,12 @@ MIT License — see [LICENSE](LICENSE) for details.
 [Discussions](https://github.com/MurShidM01/free-codex/discussions)
 
 </p>
+=======
+<p align="center">
+  <a href="https://github.com/MurShidM01/free-codex">GitHub</a>
+  ·
+  <a href="https://github.com/MurShidM01/free-codex/issues">Issues</a>
+  ·
+  <a href="https://github.com/MurShidM01/free-codex/discussions">Discussions</a>
+</p>
+>>>>>>> 32a235326d2e5e583bdd23a638123b1cd96de6ee
