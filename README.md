@@ -113,27 +113,68 @@ Access the web-based admin panel at `http://127.0.0.1:8080/admin`:
 
 ### Timeout & Retry Settings
 
-For complex tasks, long files, or slow endpoints:
+For complex tasks, long files, or reasoning/thinking models:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FREE_CODEX_READ_TIMEOUT` | `180` | Response timeout in seconds |
+| `FREE_CODEX_READ_TIMEOUT` | `300` | Response timeout in seconds |
 | `FREE_CODEX_CONNECT_TIMEOUT` | `30` | Connection timeout in seconds |
-| `FREE_CODEX_MAX_RETRIES` | `2` | Retries on transient errors |
+| `FREE_CODEX_MAX_RETRIES` | `3` | Retries on transient errors |
+| `FREE_CODEX_SSE_HEARTBEAT_SECS` | `25` | Keep-alive interval (0 to disable) |
 
 ```env
-# For long files or complex agents (5 minute timeout)
-FREE_CODEX_READ_TIMEOUT=300
+# For thinking/reasoning models (DeepSeek, Qwen3, etc.)
+FREE_CODEX_READ_TIMEOUT=600
 FREE_CODEX_CONNECT_TIMEOUT=60
-FREE_CODEX_MAX_RETRIES=3
+FREE_CODEX_MAX_RETRIES=4
+FREE_CODEX_SSE_HEARTBEAT_SECS=25
 ```
 
 ### Workspace Context Settings
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FREE_CODEX_WORKSPACE_SNIPPET_BYTES` | `49152` | Max bytes per file snippet |
-| `FREE_CODEX_WORKSPACE_SNIPPET_LINES` | `160` | Max lines per file snippet |
+| `FREE_CODEX_WORKSPACE_SNIPPET_BYTES` | `65536` | Max bytes per file snippet |
+| `FREE_CODEX_WORKSPACE_SNIPPET_LINES` | `300` | Max lines per file snippet |
+
+---
+
+## Thinking & Reasoning Models
+
+Free Codex has special support for reasoning models like DeepSeek, Qwen3, Claude with extended thinking:
+
+### Automatic Detection
+
+Thinking models (DeepSeek, Qwen3, etc.) are automatically detected and receive:
+- **Extended timeout**: Up to 10 minutes for long reasoning chains
+- **Heartbeat keep-alive**: Prevents connection drops during thinking
+- **Thinking token tracking**: Separate tracking for reasoning tokens
+
+### Supported Thinking Patterns
+
+| Model | Thinking Format |
+|-------|-----------------|
+| DeepSeek R1 | `thinking` content block + final answer |
+| Qwen3 | `reasoning_content` in delta |
+| Claude | `thinking` blocks |
+| Custom | Tagged thinking (``) auto-stripped |
+
+### Optimizing for Reasoning Tasks
+
+```env
+# DeepSeek R1 / DeepSeek Chat
+NVIDIA_NIM_MODEL=deepseek-ai/DeepSeek-R1
+
+# Qwen3
+NVIDIA_NIM_MODEL=qwen3
+
+# Extended context for complex reasoning
+FREE_CODEX_READ_TIMEOUT=900
+NVIDIA_NIM_MODEL=meta/llama-3.3-70b-instruct
+
+# Higher max_tokens for complex tasks
+# (Set in request or use thinking parameter)
+```
 
 ---
 

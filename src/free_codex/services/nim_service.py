@@ -1,4 +1,4 @@
-"""NIM service with robust SSE streaming, retries, and extended model support."""
+"""NIM service with robust SSE streaming, retries, and thinking model support."""
 
 from __future__ import annotations
 
@@ -19,21 +19,37 @@ from .sse_utils import (
     yield_error_sse,
     track_usage_and_forward,
     usage_tracker,
+    normalize_content_for_codex,
+    strip_thinking_content,
 )
 
 logger = logging.getLogger("free-codex.nim")
 
-# Configurable timeouts from environment
-READ_TIMEOUT = float(os.getenv("FREE_CODEX_READ_TIMEOUT", "180"))
+# Configurable timeouts from environment (extended for thinking models)
+READ_TIMEOUT = float(os.getenv("FREE_CODEX_READ_TIMEOUT", "300"))
 CONNECT_TIMEOUT = float(os.getenv("FREE_CODEX_CONNECT_TIMEOUT", "30"))
-MAX_RETRIES = int(os.getenv("FREE_CODEX_MAX_RETRIES", "2"))
+MAX_RETRIES = int(os.getenv("FREE_CODEX_MAX_RETRIES", "3"))
+
+# Thinking/reasoning models often need more time
+THINKING_MODELS = {
+    "deepseek", "qwen3", "qwq", "r1", "claude-sonnet-4",
+    "step", "minimax", "gpt-o", "o1", "o3", "o4",
+}
 
 
 class NIMService:
-    """Service for interacting with NVIDIA NIM / OpenAI-compatible API."""
+    """Service for interacting with NVIDIA NIM / OpenAI-compatible API, including thinking/reasoning models."""
 
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
+
+    def _is_thinking_model(self, model: str) -> bool:
+        """Check if model is a thinking/reasoning model that needs extended timeout."""
+        model_lower = (model or "").lower()
+        for tm in THINKING_MODELS:
+            if tm in model_lower:
+                return True
+        return False
 
     def _auth_headers(self) -> Dict[str, str]:
         """Get authentication headers for NIM requests."""
@@ -49,9 +65,12 @@ class NIMService:
         headers["Accept"] = "text/event-stream"
         return headers
 
-    def _timeout(self) -> httpx.Timeout:
-        """Get timeout configuration."""
-        return httpx.Timeout(READ_TIMEOUT, connect=CONNECT_TIMEOUT)
+    def _timeout(self, extended: bool = False) -> httpx.Timeout:
+        """Get timeout configuration. Use extended timeout for thinking models."""
+        timeout = READ_TIMEOUT
+        if extended:
+            timeout = max(timeout, 600)  # At least 10 minutes for thinking models
+        return httpx.Timeout(timeout, connect=CONNECT_TIMEOUT)
 
     def _get_actual_model(self, requested_model: str) -> str:
         """Resolve requested model to configured NIM model.
@@ -124,6 +143,59 @@ class NIMService:
                     continue
         raise httpx.HTTPError(f"Failed after {MAX_RETRIES + 1} attempts: {last_error}")
 
+    async def _post_with_retry_extended(
+        self,
+        url: str,
+        json: Dict[str, Any],
+        headers: Dict[str, str],
+        stream: bool = True,
+        extended: bool = True,
+    ) -> httpx.Response:
+        """POST with extended timeout for thinking/reasoning models."""
+        last_error = None
+        # More retries for long-thinking models
+        retries = max(MAX_RETRIES, 2)
+
+        for attempt in range(retries + 1):
+            try:
+                timeout = self._timeout(extended=extended)
+                if stream:
+                    response = await self.client.stream(
+                        "POST",
+                        url,
+                        json=json,
+                        headers=headers,
+                        timeout=timeout,
+                    )
+                else:
+                    response = await self.client.post(
+                        url,
+                        json=json,
+                        headers=headers,
+                        timeout=timeout,
+                    )
+                # Success - check status code
+                if 200 <= response.status_code < 300:
+                    return response
+                # Retry on certain status codes
+                if response.status_code in (502, 503, 504, 429):
+                    last_error = f"HTTP {response.status_code}"
+                    if attempt < retries:
+                        await asyncio.sleep(2 * (attempt + 1))  # Longer backoff for thinking models
+                        continue
+                return response
+            except httpx.TimeoutException as e:
+                last_error = f"Timeout after {timeout.connect_timeout}s: {e}"
+                if attempt < retries:
+                    await asyncio.sleep(2 * (attempt + 1))
+                    continue
+            except httpx.HTTPError as e:
+                last_error = f"HTTP error: {e}"
+                if attempt < retries:
+                    await asyncio.sleep(2 * (attempt + 1))
+                    continue
+        raise httpx.HTTPError(f"Failed after {retries + 1} attempts: {last_error}")
+
     def _prepare_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare payload with model override and optional extended parameters."""
         # Always use configured model
@@ -171,45 +243,72 @@ class NIMService:
     async def stream_chat_completion(
         self, request: ChatCompletionRequest
     ) -> AsyncGenerator[bytes, None]:
-        """Stream chat completion with robust error handling and retries."""
+        """Stream chat completion with robust error handling, extended timeouts for thinking models, and heartbeat."""
         payload = request.model_dump(exclude_none=True)
         payload = self._prepare_payload(payload)
         payload["stream"] = True
+
+        model = self._get_actual_model(str(payload.get("model", "")))
+        is_thinking = self._is_thinking_model(model)
 
         stream_payload = dict(payload)
         stream_payload["stream"] = True
 
         try:
-            response = await self._post_with_retry(
-                f"{settings.nim_base_url}/chat/completions",
-                json=stream_payload,
-                headers=self._auth_headers_sse(),
-                stream=True,
-            )
+            # Use extended timeout if this is a thinking/reasoning model
+            timeout = self._timeout(extended=is_thinking)
+            if is_thinking:
+                logger.info(f"Using extended timeout ({timeout.connect_timeout}s) for thinking model: {model}")
+
+            if is_thinking:
+                # For thinking models: use heartbeat wrapper for long requests
+                response = await self._post_with_retry_extended(
+                    f"{settings.nim_base_url}/chat/completions",
+                    json=stream_payload,
+                    headers=self._auth_headers_sse(),
+                    stream=True,
+                    extended=is_thinking,
+                )
+            else:
+                response = await self._post_with_retry(
+                    f"{settings.nim_base_url}/chat/completions",
+                    json=stream_payload,
+                    headers=self._auth_headers_sse(),
+                    stream=True,
+                )
 
             if not (200 <= response.status_code < 300):
                 error_body = await response.aread()
                 logger.error(f"NIM stream error: {response.status_code} - {error_body[:200]}")
                 yield await yield_error_sse(
-                    f"NIM API returned {response.status_code}",
+                    f"NIM API returned {response.status_code}: {error_body[:200].decode('utf-8', errors='replace')}",
                     "upstream_error",
                 )
                 yield b"data: [DONE]\n\n"
                 return
 
-            # Stream the response with disconnect safety and usage tracking
-            async for chunk in track_usage_and_forward(
-                sse_disconnect_safe(response.aiter_bytes())
-            ):
-                if chunk:
-                    yield chunk
+            # Stream with heartbeat for thinking models, usage tracking, and disconnect safety
+            base_stream = track_usage_and_forward(sse_disconnect_safe(response.aiter_bytes()))
+
+            if is_thinking:
+                async for chunk in sse_with_heartbeat(base_stream, interval=25.0):
+                    if chunk:
+                        yield chunk
+            else:
+                async for chunk in base_stream:
+                    if chunk:
+                        yield chunk
 
             # Ensure we send [DONE] if not already present
             yield b"data: [DONE]\n\n"
 
         except httpx.TimeoutException as e:
             logger.error(f"NIM stream timeout: {e}")
-            yield await yield_error_sse("Request timed out. Try increasing FREE_CODEX_READ_TIMEOUT.", "timeout")
+            yield await yield_error_sse(
+                "Request timed out. Thinking models may require more time. "
+                "Try: FREE_CODEX_READ_TIMEOUT=600",
+                "timeout"
+            )
             yield b"data: [DONE]\n\n"
 
         except httpx.HTTPError as e:
