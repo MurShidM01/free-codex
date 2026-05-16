@@ -23,7 +23,7 @@ logger = logging.getLogger("free-codex")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting Free Codex NIM Proxy...")
+    logger.info("Starting Free Codex server…")
     app.state.http_client = httpx.AsyncClient(
         timeout=httpx.Timeout(120.0, connect=10.0),
         limits=httpx.Limits(max_keepalive_connections=32, max_connections=100),
@@ -34,13 +34,13 @@ async def lifespan(app: FastAPI):
     )
     yield
     await app.state.http_client.aclose()
-    logger.info("Stopped Free Codex NIM Proxy.")
+    logger.info("Stopped Free Codex server.")
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Advanced Free Codex NIM Proxy",
-        description="A professional, OpenAI-compatible proxy for NVIDIA NIM.",
-        version="0.3.1",
+        title="Free Codex",
+        description="OpenAI-compatible API layer for Codex CLI and hosted models.",
+        version="0.1.0",
         lifespan=lifespan
     )
     
@@ -80,9 +80,6 @@ def create_app() -> FastAPI:
     app.include_router(chat_router, prefix="/v1")
     app.include_router(models_router, prefix="/v1")
     app.include_router(responses_router, prefix="/v1")
-    app.include_router(chat_router)
-    app.include_router(models_router)
-    app.include_router(responses_router)
 
     static_admin = Path(__file__).resolve().parent / "static" / "admin"
     app.mount(

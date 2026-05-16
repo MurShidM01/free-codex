@@ -1,7 +1,7 @@
 [project]
 name = "free-codex"
-version = "0.3.1"
-description = "Advanced OpenAI compatible proxy for NVIDIA NIM"
+version = "0.1.0"
+description = "Free Codex — OpenAI-compatible layer for Codex CLI and hosted models"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [
@@ -32,6 +32,9 @@ packages = ["src/free_codex"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/free_codex/static" = "free_codex/static"
+
+[tool.uv]
+default-groups = ["dev"]
 
 [dependency-groups]
 dev = [

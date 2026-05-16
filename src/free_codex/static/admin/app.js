@@ -1,5 +1,39 @@
 const $ = (id) => document.getElementById(id);
 
+const BANNER_OK =
+  "rounded-xl border px-4 py-3 text-sm leading-relaxed font-medium border-emerald-500/35 bg-emerald-950/40 text-emerald-200";
+const BANNER_ERR =
+  "rounded-xl border px-4 py-3 text-sm leading-relaxed font-medium border-red-500/40 bg-red-950/45 text-red-200";
+
+const LIST_COUNT_OK =
+  "inline-flex min-h-[1.375rem] items-center justify-center rounded-full bg-violet-500/25 px-2 text-xs font-bold tabular-nums text-violet-100 ring-1 ring-violet-400/35";
+
+const TEST_WORKING =
+  "inline-flex min-h-[1.375rem] items-center justify-center rounded-full bg-emerald-500/25 px-2.5 text-xs font-bold text-emerald-100 ring-1 ring-emerald-400/40";
+const TEST_FAILED =
+  "inline-flex min-h-[1.375rem] items-center justify-center rounded-full bg-red-500/20 px-2.5 text-xs font-bold text-red-100 ring-1 ring-red-400/40";
+
+function setBtnLoading(btn, on) {
+  if (!btn) return;
+  const spin = btn.querySelector(".btn-spinner");
+  const label = btn.querySelector(".btn-label");
+  btn.disabled = !!on;
+  btn.setAttribute("aria-busy", on ? "true" : "false");
+  if (spin) spin.classList.toggle("hidden", !on);
+  if (label) label.classList.toggle("opacity-75", on);
+}
+
+async function withBtn(btn, fn) {
+  setBtnLoading(btn, true);
+  try {
+    await fn();
+  } catch (e) {
+    console.error("Operation failed:", e);
+  } finally {
+    setBtnLoading(btn, false);
+  }
+}
+
 async function fetchJSON(url, opts = {}) {
   const headers = { Accept: "application/json", ...(opts.headers || {}) };
   const tok = $("token").value.trim();
@@ -13,7 +47,7 @@ async function fetchJSON(url, opts = {}) {
     data = { raw: text };
   }
   if (!res.ok) {
-    const err = new Error(res.statusText || "Request failed");
+    const err = new Error(`${res.status} ${res.statusText}`);
     err.status = res.status;
     err.body = data;
     throw err;
@@ -24,7 +58,7 @@ async function fetchJSON(url, opts = {}) {
 function showBanner(kind, msg) {
   const b = $("banner");
   b.hidden = false;
-  b.className = `banner ${kind}`;
+  b.className = kind === "err" ? BANNER_ERR : BANNER_OK;
   b.textContent = msg;
 }
 
@@ -32,6 +66,128 @@ function hideBanner() {
   const b = $("banner");
   b.hidden = true;
   b.textContent = "";
+  b.className =
+    "hidden rounded-xl border px-4 py-3 text-sm leading-relaxed font-medium";
+}
+
+function hideListCountBadge() {
+  const el = $("nim-list-count");
+  el.textContent = "0";
+  el.className = LIST_COUNT_OK;
+  el.hidden = true;
+}
+
+function showListCountBadge(data) {
+  const el = $("nim-list-count");
+  el.hidden = false;
+
+  if (!data) {
+    el.textContent = "ERR";
+    el.className = TEST_FAILED;
+    el.title = "No response from server";
+    return;
+  }
+
+  // Check for explicit error
+  if (data.error || data.raw_error) {
+    el.textContent = "Failed";
+    el.className = TEST_FAILED;
+    el.title = data.raw_error || data.error || "Unknown error";
+    return;
+  }
+
+  // check ok flag (boolean)
+  if (data.ok === true) {
+    el.textContent = String(data.model_count || "?");
+    el.className = LIST_COUNT_OK;
+    el.title = `Found ${data.model_count} models in ${data.elapsed_ms}ms`;
+    return;
+  }
+
+  // If status code is 2xx but ok is false, still show success
+  if (data.status_code && data.status_code >= 200 && data.status_code < 300) {
+    el.textContent = String(data.model_count || "OK");
+    el.className = LIST_COUNT_OK;
+    el.title = `Connected (${data.elapsed_ms}ms)`;
+    return;
+  }
+
+  // Check status code
+  if (data.status_code === 401 || data.status_code === 403) {
+    el.textContent = "Auth";
+    el.className = TEST_FAILED;
+    el.title = data.raw_error || "Authentication failed";
+    return;
+  }
+
+  el.textContent = "Failed";
+  el.className = TEST_FAILED;
+  el.title = data.raw_error || `HTTP ${data.status_code}`;
+}
+
+function hideTestStatusBadge() {
+  const el = $("nim-test-status");
+  el.textContent = "";
+  el.className =
+    "hidden min-h-[1.375rem] items-center justify-center rounded-full px-2.5 text-xs font-bold ring-1";
+  el.hidden = true;
+}
+
+function showTestStatusBadge(data) {
+  const el = $("nim-test-status");
+  el.hidden = false;
+
+  if (!data) {
+    el.textContent = "ERR";
+    el.className = TEST_FAILED;
+    el.title = "No response from server";
+    return;
+  }
+
+  // Check for explicit error
+  if (data.error || data.raw_error) {
+    el.textContent = "Failed";
+    el.className = TEST_FAILED;
+    el.title = data.raw_error || data.error || "Unknown error";
+    return;
+  }
+
+  // Check ok flag (boolean true = success)
+  if (data.ok === true) {
+    el.textContent = "Working";
+    el.className = TEST_WORKING;
+    el.title = `Response in ${data.elapsed_ms}ms: "${data.assistant_preview || '[no content]'}"`;
+    return;
+  }
+
+  // If status code is 2xx but ok is not explicitly false, show success
+  if (data.status_code && data.status_code >= 200 && data.status_code < 300) {
+    el.textContent = "Working";
+    el.className = TEST_WORKING;
+    el.title = `Response in ${data.elapsed_ms}ms`;
+    return;
+  }
+
+  // Handle authentication errors
+  if (data.status_code === 401 || data.status_code === 403) {
+    el.textContent = "Auth";
+    el.className = TEST_FAILED;
+    el.title = "Invalid or missing API key";
+    return;
+  }
+
+  // Handle other error codes
+  if (data.status_code) {
+    el.textContent = "HTTP " + data.status_code;
+    el.className = TEST_FAILED;
+    el.title = data.raw_error || `Server returned ${data.status_code}`;
+    return;
+  }
+
+  // Fallback
+  el.textContent = "Failed";
+  el.className = TEST_FAILED;
+  el.title = data.raw_error || "Connection failed";
 }
 
 function setNimFields(base, key, model) {
@@ -88,8 +244,14 @@ function nimPayload() {
   return o;
 }
 
-function showNimResult(obj) {
-  $("nim-result").textContent = JSON.stringify(obj, null, 2);
+function setValidationStyle(ok) {
+  const v = $("validation");
+  v.classList.remove(
+    "border-emerald-500/40",
+    "border-red-500/45",
+    "border-slate-700/80"
+  );
+  v.classList.add(ok ? "border-emerald-500/40" : "border-red-500/45");
 }
 
 async function loadEnv() {
@@ -101,11 +263,11 @@ async function loadEnv() {
     const lines = (data.validation_errors || []).join("\n") || "(none)";
     $("validation").textContent =
       `validation_ok: ${data.validation_ok}\n${lines}`;
-    $("validation").style.borderColor = data.validation_ok ? "#356845" : "#884444";
+    setValidationStyle(data.validation_ok);
     if (data.masked) {
       showBanner(
         "ok",
-        "Secrets masked. Use http://127.0.0.1/admin, or enter admin token + Unlock."
+        "Secrets masked. Open via http://127.0.0.1/admin, or enter admin token + Unlock."
       );
     }
     await loadNimDefaultsAfterEnv();
@@ -117,53 +279,64 @@ async function loadEnv() {
 async function saveEnv() {
   hideBanner();
   $("hint").textContent = "";
-  try {
-    const body = JSON.stringify({ content: $("env").value });
-    const data = await fetchJSON("/admin/api/env", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    showBanner("ok", data.hint || "Saved.");
-    await loadEnv();
-  } catch (e) {
-    const detail = e.body?.detail || e.body?.validation_errors || e.message;
-    showBanner("err", typeof detail === "object" ? JSON.stringify(detail) : detail);
-  }
+  await withBtn($("save"), async () => {
+    try {
+      const body = JSON.stringify({ content: $("env").value });
+      const data = await fetchJSON("/admin/api/env", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      showBanner("ok", data.hint || "Saved successfully.");
+      await loadEnv();
+    } catch (e) {
+      const detail = e.body?.detail || e.body?.validation_errors || e.message;
+      showBanner(
+        "err",
+        typeof detail === "object" ? JSON.stringify(detail) : detail
+      );
+    }
+  });
 }
 
 async function nimListModels() {
-  $("nim-result").textContent = "Loading…";
-  try {
-    const data = await fetchJSON("/admin/api/nim/models", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(nimPayload()),
-    });
-    showNimResult(data);
-  } catch (e) {
-    showNimResult({ error: e.body?.detail || e.body || e.message });
-  }
+  await withBtn($("nim-list"), async () => {
+    try {
+      const data = await fetchJSON("/admin/api/nim/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nimPayload()),
+      });
+      showListCountBadge(data);
+    } catch (e) {
+      showListCountBadge({
+        error: e.body?.detail || e.body || e.message || "Request failed",
+      });
+    }
+  });
 }
 
 async function nimTestChat() {
-  $("nim-result").textContent = "Testing…";
-  try {
-    const data = await fetchJSON("/admin/api/nim/test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(nimPayload()),
-    });
-    showNimResult(data);
-  } catch (e) {
-    showNimResult({ error: e.body?.detail || e.body || e.message });
-  }
+  await withBtn($("nim-test"), async () => {
+    try {
+      const data = await fetchJSON("/admin/api/nim/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nimPayload()),
+      });
+      showTestStatusBadge(data);
+    } catch (e) {
+      showTestStatusBadge({
+        error: e.message || e.body?.detail || e.body || "Request failed",
+      });
+    }
+  });
 }
 
-document.getElementById("reload").addEventListener("click", loadEnv);
-document.getElementById("unlock").addEventListener("click", loadEnv);
-document.getElementById("save").addEventListener("click", saveEnv);
-document.getElementById("nim-list").addEventListener("click", nimListModels);
-document.getElementById("nim-test").addEventListener("click", nimTestChat);
+$("reload").addEventListener("click", () => withBtn($("reload"), loadEnv));
+$("unlock").addEventListener("click", () => withBtn($("unlock"), loadEnv));
+$("save").addEventListener("click", saveEnv);
+$("nim-list").addEventListener("click", nimListModels);
+$("nim-test").addEventListener("click", nimTestChat);
 
 loadEnv();

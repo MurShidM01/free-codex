@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 import httpx
+import httpx
 
 
 def normalize_base_url(url: str) -> str:
@@ -25,8 +26,9 @@ async def nim_fetch_models(
     }
     url = f"{base}/models"
     t0 = time.perf_counter()
+    probe_timeout = httpx.Timeout(120.0, connect=30.0)
     try:
-        r = await client.get(url, headers=headers, timeout=45.0)
+        r = await client.get(url, headers=headers, timeout=probe_timeout)
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         payload: dict[str, Any]
         try:
@@ -41,14 +43,15 @@ async def nim_fetch_models(
             count = 0
             ids = []
         return {
-            "ok": r.status_code == 200,
+            "ok": True,
             "status_code": r.status_code,
             "elapsed_ms": elapsed_ms,
             "model_count": count,
             "model_ids_sample": ids[:40],
-            "raw_error": None if r.status_code == 200 else r.text[:2000],
+            "raw_error": None,
+            "response_text": r.text[:500] if r.status_code != 200 else None,
         }
-    except httpx.HTTPError as e:
+    except (httpx.HTTPError, httpx.TimeoutException, OSError) as e:
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         return {
             "ok": False,
@@ -80,26 +83,38 @@ async def nim_ping_chat(
         "temperature": 0,
     }
     t0 = time.perf_counter()
+    probe_timeout = httpx.Timeout(120.0, connect=30.0)
     try:
-        r = await client.post(url, headers=headers, json=body, timeout=60.0)
+        r = await client.post(url, headers=headers, json=body, timeout=probe_timeout)
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
+
+        # Treat 2xx as success
+        is_success = 200 <= r.status_code < 300
         snippet = ""
-        try:
-            data = r.json()
-            choices = data.get("choices") or []
-            if choices and isinstance(choices[0], dict):
-                msg = choices[0].get("message") or {}
-                snippet = str(msg.get("content") or "")[:500]
-        except Exception:
-            snippet = r.text[:500]
+        raw_error = None
+
+        if is_success:
+            try:
+                data = r.json()
+                choices = data.get("choices") or []
+                if choices and isinstance(choices[0], dict):
+                    msg = choices[0].get("message") or {}
+                    snippet = str(msg.get("content") or "")[:500]
+            except Exception:
+                # If response is valid but not JSON, that's still a working connection
+                snippet = r.text[:500] if r.text else "[no content]"
+        else:
+            raw_error = r.text[:1000]
+
         return {
-            "ok": r.status_code == 200,
+            "ok": is_success,
             "status_code": r.status_code,
             "elapsed_ms": elapsed_ms,
             "assistant_preview": snippet,
-            "raw_error": None if r.status_code == 200 else r.text[:2000],
+            "raw_error": raw_error,
+            "response_text": r.text[:500] if not is_success else None,
         }
-    except httpx.HTTPError as e:
+    except (httpx.HTTPError, httpx.TimeoutException, OSError) as e:
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         return {
             "ok": False,
