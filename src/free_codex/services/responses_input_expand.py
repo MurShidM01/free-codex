@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import uuid
 from typing import Any
 
 from .nim_chat_payload import normalize_tool_call
@@ -45,10 +47,34 @@ def response_items_to_chat_messages(items: list[Any]) -> list[dict[str, Any]]:
             out.append(tool_msg)
             continue
 
+        # Handle computer_call type (Claude computer use)
+        if raw.get("type") == "computer_call":
+            cc = raw.get("call")
+            if isinstance(cc, dict):
+                cid = cc.get("id") or f"call_{uuid.uuid4().hex[:16]}"
+                fn = cc.get("function")
+                if isinstance(fn, dict):
+                    name = fn.get("name", "")
+                    args = fn.get("arguments", "{}")
+                    if isinstance(args, str):
+                        args_str = args
+                    else:
+                        args_str = json.dumps(args)
+                    pending_calls.append({
+                        "id": cid,
+                        "type": "function",
+                        "function": {"name": name, "arguments": args_str}
+                    })
+            continue
+
         if raw.get("type") == "function_call":
             tc = chat_tool_call_from_response_function_call(raw)
             if tc:
                 pending_calls.append(tc)
+            continue
+
+        # Handle input_audio (audio input - skip)
+        if raw.get("type") == "input_audio":
             continue
 
         flush_assistant()

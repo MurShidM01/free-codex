@@ -24,10 +24,29 @@ def format_tool_output_body(output: Any) -> str:
                     if isinstance(chunk, str):
                         parts.append(chunk)
                         continue
+                # Handle computer_call_output and function_call_output blocks
+                if el.get("type") in ("computer_call_output", "function_call_output"):
+                    output_text = el.get("output", el.get("text", ""))
+                    if isinstance(output_text, str):
+                        parts.append(output_text)
+                        continue
+                    parts.append(json.dumps(output_text, separators=(",", ":"), ensure_ascii=False))
+                    continue
                 parts.append(json.dumps(el, separators=(",", ":"), ensure_ascii=False))
             else:
                 parts.append(str(el))
         return "\n".join(parts)
+    if isinstance(output, dict):
+        # Handle dict outputs (e.g., file contents, directory listings)
+        output_text = output.get("text") or output.get("output") or output.get("content", "")
+        if isinstance(output_text, str):
+            return output_text
+        # Try to extract meaningful content from dict
+        if "stdout" in output:
+            return str(output["stdout"])
+        if "result" in output:
+            return str(output["result"])
+        return json.dumps(output, separators=(",", ":"), ensure_ascii=False)
     return json.dumps(output, separators=(",", ":"), ensure_ascii=False)
 
 
@@ -102,9 +121,21 @@ def tool_output_to_chat_message(item: dict[str, Any]) -> dict[str, Any] | None:
         cid = item.get("call_id")
         if not cid:
             return None
+        # Extract output from various possible fields
+        output = item.get("output") or item.get("result") or item.get("text") or ""
         return {
             "role": "tool",
             "tool_call_id": str(cid),
-            "content": format_tool_output_body(item.get("output")),
+            "content": format_tool_output_body(output),
         }
+    # Handle generic output types that might have call_id
+    if t and "call_id" in item:
+        cid = item.get("call_id")
+        output = item.get("output") or item.get("result") or item.get("text", "")
+        if cid and output:
+            return {
+                "role": "tool",
+                "tool_call_id": str(cid),
+                "content": format_tool_output_body(output),
+            }
     return None

@@ -173,6 +173,24 @@ async def stream_responses_body(
                                                 "sequence_number": seq.next(),
                                             },
                                         )
+                                # Handle computer_call_output type blocks
+                                elif block_type in ("computer_call_output", "function_call_output"):
+                                    output_text = block.get("output", block.get("text", ""))
+                                    if output_text:
+                                        full_text_parts.append(str(output_text))
+                                        async for piece in iter_text_deltas(str(output_text)):
+                                            yield encode_sse(
+                                                "response.output_text.delta",
+                                                {
+                                                    "type": "response.output_text.delta",
+                                                    "item_id": msg_id,
+                                                    "output_index": current_output_index,
+                                                    "content_index": 0,
+                                                    "delta": piece,
+                                                    "logprobs": _LOGPROBS,
+                                                    "sequence_number": seq.next(),
+                                                },
+                                            )
 
             # Handle function calls
             tool_calls = delta.get("tool_calls") or []

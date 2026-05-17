@@ -7,9 +7,10 @@ from free_codex.routes.responses import get_nim_service
 def test_health_check():
     app = create_app()
     client = TestClient(app)
-    response = client.get("/health")
+    # /health serves HTML dashboard, /health/json returns status
+    response = client.get("/health/json")
     assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    assert response.json()["status"] == "healthy"
 
 def test_list_models():
     app = create_app()
