@@ -12,10 +12,18 @@ def _remote_client(monkeypatch):
     return TestClient(create_app())
 
 
-def test_admin_nim_defaults_forbidden_when_remote(monkeypatch):
+def test_admin_nim_defaults_public_model(monkeypatch, tmp_path):
+    # Unauthenticated remote requests can still get the model (no secrets)
     client = _remote_client(monkeypatch)
+    env_file = tmp_path / ".env"
+    env_file.write_text("NVIDIA_NIM_MODEL=test-model\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "free_codex.services.admin_env.free_codex_dotenv",
+        lambda: env_file,
+    )
     r = client.get("/admin/api/nim/defaults")
-    assert r.status_code == 403
+    assert r.status_code == 200
+    assert r.json() == {"model": "test-model"}
 
 
 def test_admin_nim_defaults_ok_when_local_trusted(monkeypatch, tmp_path):

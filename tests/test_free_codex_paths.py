@@ -18,7 +18,7 @@ def test_paths_under_dot_config():
 
 def test_default_health_url_respects_port_env():
     with patch.dict(os.environ, {"FREE_CODEX_PORT": "9999"}, clear=False):
-        assert default_server_health_url() == "http://127.0.0.1:9999/health"
+        assert default_server_health_url() == "http://127.0.0.1:9999/health/json"
 
 
 def _exit(code: int = 0) -> None:

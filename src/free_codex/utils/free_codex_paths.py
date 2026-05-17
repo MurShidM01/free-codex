@@ -21,4 +21,4 @@ def free_codex_dotenv() -> Path:
 def default_server_health_url() -> str:
     port = int(os.getenv("FREE_CODEX_PORT", "8080"))
     host = os.getenv("FREE_CODEX_HEALTH_HOST", "127.0.0.1")
-    return f"http://{host}:{port}/health"
+    return f"http://{host}:{port}/health/json"

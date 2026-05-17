@@ -55,18 +55,16 @@ def _merge_model(body: NimProbeFields) -> str:
 
 @router.get("/api/nim/defaults")
 async def admin_nim_defaults(request: Request) -> JSONResponse:
-    if not can_access_admin_secrets(request):
-        raise HTTPException(
-            status_code=403,
-            detail=(
-                "Use Unlock with FREE_CODEX_ADMIN_TOKEN, or open /admin from "
-                "http://127.0.0.1 on this machine to load NIM fields from .env."
-            ),
-        )
     d = _disk_env()
     model = (d.get("NVIDIA_NIM_MODEL") or "").strip()
     if not model:
         model = "gpt-5.5"
+
+    if not can_access_admin_secrets(request):
+        # Unauthenticated: only return model, no secrets
+        return JSONResponse({"model": model})
+
+    # Authenticated: return full config
     return JSONResponse(
         {
             "base_url": (d.get("NVIDIA_NIM_BASE_URL") or "").strip(),
