@@ -109,22 +109,43 @@ Access the web-based admin panel at `http://127.0.0.1:8080/admin`:
 
 ---
 
-## VS Code Claude Code Extension Compatibility
+## VS Code Extension Compatibility
 
-Free Codex works seamlessly with the **Claude Code VS Code extension**. Once installed, you can configure it to use Free Codex as the backend instead of OpenAI.
+Free Codex works with VS Code extensions that support custom API endpoints. Configure them to use Free Codex as the backend.
 
 ### Setup
 
 1. **Start Free Codex Server**
 
 ```bash
-# Terminal 1: Start the proxy server
+# Start the proxy server
 fc-server
 ```
 
 2. **Configure VS Code Settings**
 
 Add the following to your VS Code `settings.json` (File → Preferences → Settings → Open JSON):
+
+#### For ChatGPT for VS Code Extension
+
+```json
+{
+  "chatgpt.cliExecutable": "codex"
+}
+```
+
+Then set environment variables via `chatgpt.env`:
+
+```json
+{
+  "chatgpt.env": {
+    "OPENAI_BASE_URL": "http://localhost:8080",
+    "OPENAI_API_KEY": "freecodex"
+  }
+}
+```
+
+#### For Claude Code Extension (Official)
 
 ```json
 {
@@ -164,9 +185,9 @@ If you changed the default port (8080), update the URL accordingly:
 
 ```json
 {
-  "claudeCode.environmentVariables": [
-    { "name": "OPENAI_BASE_URL", "value": "http://localhost:YOUR_PORT" }
-  ]
+  "chatgpt.env": {
+    "OPENAI_BASE_URL": "http://localhost:YOUR_PORT"
+  }
 }
 ```
 
@@ -176,11 +197,10 @@ For connecting to a Free Codex server on another machine:
 
 ```json
 {
-  "claudeCode.environmentVariables": [
-    { "name": "OPENAI_BASE_URL", "value": "http://192.168.1.100:8080" },
-    { "name": "OPENAI_API_KEY", "value": "freecodex" },
-    { "name": "CODEX_ENABLE_GATEWAY_MODEL_DISCOVERY", "value": "1" }
-  ]
+  "chatgpt.env": {
+    "OPENAI_BASE_URL": "http://192.168.1.100:8080",
+    "OPENAI_API_KEY": "freecodex"
+  }
 }
 ```
 
@@ -190,11 +210,10 @@ If you've enabled admin authentication on Free Codex:
 
 ```json
 {
-  "claudeCode.environmentVariables": [
-    { "name": "OPENAI_BASE_URL", "value": "http://localhost:8080" },
-    { "name": "OPENAI_API_KEY", "value": "YOUR_ADMIN_TOKEN" },
-    { "name": "CODEX_ENABLE_GATEWAY_MODEL_DISCOVERY", "value": "1" }
-  ]
+  "chatgpt.env": {
+    "OPENAI_BASE_URL": "http://localhost:8080",
+    "OPENAI_API_KEY": "YOUR_ADMIN_TOKEN"
+  }
 }
 ```
 
