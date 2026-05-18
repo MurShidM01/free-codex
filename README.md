@@ -109,6 +109,97 @@ Access the web-based admin panel at `http://127.0.0.1:8080/admin`:
 
 ---
 
+## VS Code Claude Code Extension Compatibility
+
+Free Codex works seamlessly with the **Claude Code VS Code extension**. Once installed, you can configure it to use Free Codex as the backend instead of OpenAI.
+
+### Setup
+
+1. **Start Free Codex Server**
+
+```bash
+# Terminal 1: Start the proxy server
+fc-server
+```
+
+2. **Configure VS Code Settings**
+
+Add the following to your VS Code `settings.json` (File → Preferences → Settings → Open JSON):
+
+```json
+{
+  "claudeCode.environmentVariables": [
+    { "name": "OPENAI_BASE_URL", "value": "http://localhost:8080" },
+    { "name": "OPENAI_API_KEY", "value": "freecodex" },
+    { "name": "CODEX_ENABLE_GATEWAY_MODEL_DISCOVERY", "value": "1" }
+  ]
+}
+```
+
+Or if you prefer to edit the settings file directly:
+
+```json
+{
+  "claudeCode": {
+    "environmentVariables": [
+      { "name": "OPENAI_BASE_URL", "value": "http://localhost:8080" },
+      { "name": "OPENAI_API_KEY", "value": "freecodex" },
+      { "name": "CODEX_ENABLE_GATEWAY_MODEL_DISCOVERY", "value": "1" }
+    ]
+  }
+}
+```
+
+### Environment Variables Explained
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `OPENAI_BASE_URL` | `http://localhost:8080` | Free Codex proxy URL |
+| `OPENAI_API_KEY` | `freecodex` | Dummy key (Free Codex accepts any value) |
+| `CODEX_ENABLE_GATEWAY_MODEL_DISCOVERY` | `1` | Enable model discovery via `/v1/models` |
+
+### Custom Port
+
+If you changed the default port (8080), update the URL accordingly:
+
+```json
+{
+  "claudeCode.environmentVariables": [
+    { "name": "OPENAI_BASE_URL", "value": "http://localhost:YOUR_PORT" }
+  ]
+}
+```
+
+### Remote Server
+
+For connecting to a Free Codex server on another machine:
+
+```json
+{
+  "claudeCode.environmentVariables": [
+    { "name": "OPENAI_BASE_URL", "value": "http://192.168.1.100:8080" },
+    { "name": "OPENAI_API_KEY", "value": "freecodex" },
+    { "name": "CODEX_ENABLE_GATEWAY_MODEL_DISCOVERY", "value": "1" }
+  ]
+}
+```
+
+### Authentication
+
+If you've enabled admin authentication on Free Codex:
+
+```json
+{
+  "claudeCode.environmentVariables": [
+    { "name": "OPENAI_BASE_URL", "value": "http://localhost:8080" },
+    { "name": "OPENAI_API_KEY", "value": "YOUR_ADMIN_TOKEN" },
+    { "name": "CODEX_ENABLE_GATEWAY_MODEL_DISCOVERY", "value": "1" }
+  ]
+}
+```
+
+---
+
 ## Advanced Configuration
 
 ### Timeout & Retry Settings
