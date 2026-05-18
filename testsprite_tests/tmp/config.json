@@ -1,0 +1,18 @@
+{
+  "status": "init",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:8080/",
+  "backendAuthType": "public",
+  "executionArgs": {
+    "projectName": "free-codex",
+    "projectPath": "D:\\Coding\\Tools-Scripts\\free-codex",
+    "testIds": [],
+    "additionalInstruction": "Test the following critical endpoints:\n1. POST /v1/chat/completions - with and without streaming\n2. POST /v1/responses - test both streaming and non-streaming\n3. GET /admin/api/status - verify server status\n4. GET /admin/api/env - fetch current configuration\n5. GET /health - verify server info",
+    "serverMode": "production",
+    "envs": {
+      "API_KEY": "sk-user-HlRsuJ484TMTR6JcCyVHoWBQ94lZFmP-DJ_AQPhdakreA3NvZ_VmYauOYPmXXErbY6gK58XzgLi_HEwckuSDmkqNa0TlF5Q9hS62l_kn-O9C4-tYrTBuDL4TrQj45mYNDDI"
+    }
+  },
+  "serverPort": 52331
+}

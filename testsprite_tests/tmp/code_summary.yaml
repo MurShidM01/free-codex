@@ -1,0 +1,108 @@
+version: "2"
+type: backend
+tech_stack:
+  - Python
+  - FastAPI
+  - uvicorn
+  - SQLite
+  - httpx
+features:
+  - name: Responses API
+    description: OpenAI Responses API with SSE streaming support for AI model interactions
+    files:
+      - src/free_codex/routes/responses.py
+      - src/free_codex/services/responses_bridge.py
+      - src/free_codex/services/responses_messages.py
+      - src/free_codex/services/responses_output_items.py
+    endpoints:
+      - method: POST
+        path: /v1/responses
+        description: OpenAI Responses API endpoint with streaming and non-streaming support
+        auth_required: false
+        request_schema:
+          body:
+            model: string
+            input: string | object
+            stream: boolean
+        response_schema:
+          "200": Response object
+          "500": Server error
+      - method: POST
+        path: /v1/responses/stream
+        description: Dedicated streaming endpoint for Responses API with SSE format
+        auth_required: false
+        request_schema:
+          body:
+            model: string
+            input: string | object
+        response_schema:
+          "200": SSE stream
+          "500": Error stream
+  - name: Chat Completions API
+    description: OpenAI Chat Completions compatible endpoint for conversational AI
+    files:
+      - src/free_codex/routes/chat.py
+      - src/free_codex/services/nim_service.py
+    endpoints:
+      - method: POST
+        path: /v1/chat/completions
+        description: Chat completions with streaming and non-streaming support
+        auth_required: false
+        request_schema:
+          body:
+            model: string
+            messages: array
+            stream: boolean
+            temperature: number
+            max_tokens: number
+        response_schema:
+          "200": ChatCompletion
+          "4xx": Validation error
+  - name: Admin Panel
+    description: Browser UI and APIs for managing .env configuration and monitoring usage
+    files:
+      - src/free_codex/routes/admin.py
+      - src/free_codex/services/admin_env.py
+      - src/free_codex/static/admin/index.html
+    endpoints:
+      - method: GET
+        path: /admin
+        description: Admin panel HTML page
+        auth_required: false
+        response_schema:
+          "200": HTML
+          "500": Missing UI
+      - method: GET
+        path: /admin/api/env
+        description: Get current .env configuration
+        auth_required: false
+        response_schema:
+          "200": EnvConfig
+      - method: POST
+        path: /admin/api/env
+        description: Save .env configuration
+        auth_required: true
+        request_schema:
+          body:
+            content: string
+        response_schema:
+          "200": Success response
+          "400": Validation errors
+      - method: GET
+        path: /admin/api/status
+        description: Get admin configuration status
+        auth_required: false
+        response_schema:
+          "200": Status object
+      - method: GET
+        path: /admin/api/usage
+        description: Get usage statistics
+        auth_required: false
+        response_schema:
+          "200": UsageStats object
+  - name: Health Dashboard
+    description: Real-time server status dashboard
+    files:
+      - src/free_codex/static/health.html
+      - src/free_codex/services/sse_utils.py
+known_limitations: []

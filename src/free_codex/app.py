@@ -367,4 +367,43 @@ def create_app() -> FastAPI:
             headers={"X-Request-ID": request_id},
         )
 
+    @app.get("/v1/auth/sentinel")
+    @app.get("/auth/sentinel")
+    async def auth_sentinel(request: Request):
+        """Auth sentinel endpoint for Codex CLI and VS Code extension.
+
+        Returns a valid auth response to confirm the API key is accepted.
+        """
+        return JSONResponse(
+            content={
+                "api_key": "accepted",
+                "token_type": "Bearer",
+            },
+        )
+
+    @app.post("/v1/auth/sentinel")
+    @app.post("/auth/sentinel")
+    async def auth_sentinel_post(request: Request):
+        """Auth sentinel POST endpoint."""
+        return JSONResponse(
+            content={
+                "api_key": "accepted",
+                "token_type": "Bearer",
+            },
+        )
+
+    @app.get("/v1/auth/session")
+    @app.get("/auth/session")
+    async def auth_session(request: Request):
+        """Auth session endpoint for Codex VS Code extension."""
+        scope = request.query_params.get("scope", "codex")
+        return JSONResponse(
+            content={
+                "access_token": "freecodex_token",
+                "token_type": "Bearer",
+                "expires_in": 86400,
+                "scope": scope,
+            },
+        )
+
     return app
