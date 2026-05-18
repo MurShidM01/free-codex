@@ -232,10 +232,17 @@ async def iter_openai_chat_sse(
             for raw_line in block.split(b"\n"):
                 if raw_line.startswith(b"\r"):
                     raw_line = raw_line[1:]
-                if not raw_line.startswith(b"data: "):
+                # Strip leading/trailing whitespace (some providers add padding)
+                raw_line = raw_line.strip()
+                if not raw_line.startswith(b"data:"):
                     continue
 
-                ds = raw_line[6:].decode("utf-8", errors="replace").strip()
+                # Extract JSON after "data:" prefix (handle both "data:" and "data: ")
+                if raw_line.startswith(b"data: "):
+                    ds = raw_line[6:].decode("utf-8", errors="replace").strip()
+                else:
+                    ds = raw_line[5:].decode("utf-8", errors="replace").strip()
+
                 if not ds or ds == "[DONE]":
                     yield {"done": True}
                     return
