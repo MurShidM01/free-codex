@@ -111,7 +111,7 @@ Access the web-based admin panel at `http://127.0.0.1:8080/admin`:
 
 ## VS Code Extension Compatibility
 
-Free Codex works with VS Code extensions that support custom API endpoints. Configure them to use Free Codex as the backend.
+Free Codex works with VS Code extensions that support OpenAI Codex CLI. Configure them to use Free Codex as the backend.
 
 ### Setup
 
@@ -126,47 +126,14 @@ fc-server
 
 Add the following to your VS Code `settings.json` (File → Preferences → Settings → Open JSON):
 
-#### For ChatGPT for VS Code Extension
+#### For ChatGPT for VS Code Extension (or similar Codex-compatible extensions)
 
 ```json
 {
-  "chatgpt.cliExecutable": "codex"
-}
-```
-
-Then set environment variables via `chatgpt.env`:
-
-```json
-{
+  "chatgpt.cliExecutable": "codex",
   "chatgpt.env": {
     "OPENAI_BASE_URL": "http://localhost:8080",
     "OPENAI_API_KEY": "freecodex"
-  }
-}
-```
-
-#### For Claude Code Extension (Official)
-
-```json
-{
-  "claudeCode.environmentVariables": [
-    { "name": "OPENAI_BASE_URL", "value": "http://localhost:8080" },
-    { "name": "OPENAI_API_KEY", "value": "freecodex" },
-    { "name": "CODEX_ENABLE_GATEWAY_MODEL_DISCOVERY", "value": "1" }
-  ]
-}
-```
-
-Or if you prefer to edit the settings file directly:
-
-```json
-{
-  "claudeCode": {
-    "environmentVariables": [
-      { "name": "OPENAI_BASE_URL", "value": "http://localhost:8080" },
-      { "name": "OPENAI_API_KEY", "value": "freecodex" },
-      { "name": "CODEX_ENABLE_GATEWAY_MODEL_DISCOVERY", "value": "1" }
-    ]
   }
 }
 ```
@@ -177,7 +144,6 @@ Or if you prefer to edit the settings file directly:
 |----------|-------|-------------|
 | `OPENAI_BASE_URL` | `http://localhost:8080` | Free Codex proxy URL |
 | `OPENAI_API_KEY` | `freecodex` | Dummy key (Free Codex accepts any value) |
-| `CODEX_ENABLE_GATEWAY_MODEL_DISCOVERY` | `1` | Enable model discovery via `/v1/models` |
 
 ### Custom Port
 
@@ -186,7 +152,8 @@ If you changed the default port (8080), update the URL accordingly:
 ```json
 {
   "chatgpt.env": {
-    "OPENAI_BASE_URL": "http://localhost:YOUR_PORT"
+    "OPENAI_BASE_URL": "http://localhost:YOUR_PORT",
+    "OPENAI_API_KEY": "freecodex"
   }
 }
 ```
