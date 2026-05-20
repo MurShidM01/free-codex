@@ -97,6 +97,17 @@ async def api_env_post(request: Request, body: EnvSaveBody) -> JSONResponse:
     )
 
 
+@router.post("/api/env/validate")
+async def api_env_validate(body: EnvSaveBody) -> JSONResponse:
+    errs = validation_errors(parse_dotenv_lines(body.content))
+    return JSONResponse(
+        {
+            "ok": len(errs) == 0,
+            "validation_errors": errs,
+        }
+    )
+
+
 @router.get("/api/status")
 async def api_status() -> JSONResponse:
     tok_set = bool(admin_bearer_configured())

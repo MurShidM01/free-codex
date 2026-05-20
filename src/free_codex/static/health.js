@@ -74,9 +74,15 @@ async function loadStats() {
     if (modelResp && modelResp.ok) {
       const data = await modelResp.json();
       const modelEl = $('stat-model');
+      const heroModel = $('hero-model');
+      const modelName = data.model ? data.model.split('/').pop() : 'Unknown';
       if (modelEl && data.model) {
-        modelEl.textContent = data.model.split('/').pop();
+        modelEl.textContent = modelName;
         modelEl.title = data.model;
+      }
+      if (heroModel) {
+        heroModel.textContent = modelName;
+        heroModel.title = data.model || '';
       }
       $('cfg-model').textContent = data.model || 'Not configured';
       $('cfg-base-url').textContent = data.base_url ? data.base_url.replace('https://', '').replace('http://', '') : 'Not configured';
@@ -84,6 +90,8 @@ async function loadStats() {
   } catch (e) {
     console.log('Config fetch skipped (normal for unauthenticated)');
     $('stat-model').textContent = 'See Admin';
+    const heroModel = $('hero-model');
+    if (heroModel) heroModel.textContent = 'See Admin';
     $('cfg-model').textContent = 'Use Admin Panel';
     $('cfg-base-url').textContent = 'Use Admin Panel';
   }
@@ -135,20 +143,52 @@ async function loadStats() {
   }
 }
 
-// Format version badge
-function updateVersion() {
+// Load health status and update dashboard badges
+async function loadHealthStatus() {
   const versionBadge = $('version-badge');
-  if (versionBadge) {
-    fetch('/health').then(r => r.ok && (document.title = 'Free Codex — Healthy'))
-      .catch(() => {});
+  const heroVersion = $('hero-version');
+  const statusLabel = $('status-label');
+  const statusDot = $('server-status-dot');
+  const heroStatusDot = $('hero-status-dot');
+  const heroServer = $('hero-server');
+
+  try {
+    const resp = await fetch('/health/json', { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const healthy = data.status === 'healthy';
+
+    if (statusLabel) statusLabel.textContent = healthy ? 'Healthy' : 'Degraded';
+    if (heroServer) heroServer.textContent = healthy ? 'Healthy' : 'Offline';
+    [statusDot, heroStatusDot].forEach((dot) => {
+      if (!dot) return;
+      dot.classList.toggle('bg-emerald-400', healthy);
+      dot.classList.toggle('bg-red-400', !healthy);
+    });
+    if (versionBadge) versionBadge.textContent = data.version ? `v${data.version}` : 'v0.0.0';
+    if (heroVersion) heroVersion.textContent = data.version ? `v${data.version}` : 'v0.0.0';
+    document.title = `Free Codex — ${healthy ? 'Healthy' : 'Degraded'}`;
+  } catch (err) {
+    if (statusLabel) statusLabel.textContent = 'Offline';
+    if (heroServer) heroServer.textContent = 'Offline';
+    [statusDot, heroStatusDot].forEach((dot) => {
+      if (!dot) return;
+      dot.classList.remove('bg-emerald-400');
+      dot.classList.add('bg-red-400');
+    });
+    if (versionBadge) versionBadge.textContent = 'offline';
+    if (heroVersion) heroVersion.textContent = 'offline';
+    document.title = 'Free Codex — Offline';
+    console.warn('Health status fetch failed:', err);
   }
 }
 
 // Initial load
 document.addEventListener('DOMContentLoaded', () => {
   loadStats();
+  loadHealthStatus();
   updateUptime();
-  updateVersion();
   setInterval(updateUptime, 1000);
   setInterval(loadStats, 15000); // Refresh stats every 15s
+  setInterval(loadHealthStatus, 15000);
 });

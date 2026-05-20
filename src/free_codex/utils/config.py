@@ -189,26 +189,32 @@ class Settings:
     @property
     def read_timeout(self) -> int:
         raw = self._get_env("FREE_CODEX_READ_TIMEOUT", required=False)
-        try:
-            return int(raw) if raw else 300
-        except ValueError:
-            return 300
+        if raw:
+            try:
+                return int(raw)
+            except ValueError:
+                pass
+        return TimeoutConfig.for_preset(self.provider_preset).read
 
     @property
     def connect_timeout(self) -> int:
         raw = self._get_env("FREE_CODEX_CONNECT_TIMEOUT", required=False)
-        try:
-            return int(raw) if raw else 30
-        except ValueError:
-            return 30
+        if raw:
+            try:
+                return int(raw)
+            except ValueError:
+                pass
+        return TimeoutConfig.for_preset(self.provider_preset).connect
 
     @property
     def max_retries(self) -> int:
         raw = self._get_env("FREE_CODEX_MAX_RETRIES", required=False)
-        try:
-            return int(raw) if raw else 3
-        except ValueError:
-            return 3
+        if raw:
+            try:
+                return int(raw)
+            except ValueError:
+                pass
+        return TimeoutConfig.for_preset(self.provider_preset).max_retries
 
     @property
     def sse_heartbeat(self) -> int:

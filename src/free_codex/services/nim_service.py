@@ -25,15 +25,10 @@ from .sse_utils import (
 
 logger = logging.getLogger("free-codex.nim")
 
-# Configurable timeouts from environment (extended for thinking models)
-READ_TIMEOUT = float(os.getenv("FREE_CODEX_READ_TIMEOUT", "300"))
-CONNECT_TIMEOUT = float(os.getenv("FREE_CODEX_CONNECT_TIMEOUT", "30"))
-MAX_RETRIES = int(os.getenv("FREE_CODEX_MAX_RETRIES", "3"))
-
 # Thinking/reasoning models often need more time
 THINKING_MODELS = {
     "deepseek", "qwen3", "qwq", "r1", "claude-sonnet-4",
-    "step", "minimax", "gpt-o", "o1", "o3", "o4",
+    "step", "minimax", "glm", "gpt-o", "o1", "o3", "o4",
 }
 
 
@@ -67,10 +62,11 @@ class NIMService:
 
     def _timeout(self, extended: bool = False) -> httpx.Timeout:
         """Get timeout configuration. Use extended timeout for thinking models."""
-        timeout = READ_TIMEOUT
+        timeout = settings.read_timeout
+        connect_timeout = settings.connect_timeout
         if extended:
             timeout = max(timeout, 600)  # At least 10 minutes for thinking models
-        return httpx.Timeout(timeout, connect=CONNECT_TIMEOUT)
+        return httpx.Timeout(timeout, connect=connect_timeout)
 
     def _get_actual_model(self, requested_model: str) -> str:
         """Resolve requested model to configured NIM model.
@@ -101,61 +97,11 @@ class NIMService:
         json: Dict[str, Any],
         headers: Dict[str, str],
         stream: bool = False,
+        extended: bool = False,
     ) -> httpx.Response:
         """POST with automatic retry on transient errors."""
+        retries = settings.max_retries
         last_error = None
-        for attempt in range(MAX_RETRIES + 1):
-            try:
-                if stream:
-                    response = await self.client.stream(
-                        "POST",
-                        url,
-                        json=json,
-                        headers=headers,
-                        timeout=self._timeout(),
-                    )
-                else:
-                    response = await self.client.post(
-                        url,
-                        json=json,
-                        headers=headers,
-                        timeout=self._timeout(),
-                    )
-                # Success - check status code
-                if 200 <= response.status_code < 300:
-                    return response
-                # Retry on certain status codes
-                if response.status_code in (502, 503, 504, 429):
-                    last_error = f"HTTP {response.status_code}"
-                    if attempt < MAX_RETRIES:
-                        await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
-                        continue
-                return response
-            except httpx.TimeoutException as e:
-                last_error = f"Timeout: {e}"
-                if attempt < MAX_RETRIES:
-                    await asyncio.sleep(1 * (attempt + 1))
-                    continue
-            except httpx.HTTPError as e:
-                last_error = f"HTTP error: {e}"
-                if attempt < MAX_RETRIES:
-                    await asyncio.sleep(1 * (attempt + 1))
-                    continue
-        raise httpx.HTTPError(f"Failed after {MAX_RETRIES + 1} attempts: {last_error}")
-
-    async def _post_with_retry_extended(
-        self,
-        url: str,
-        json: Dict[str, Any],
-        headers: Dict[str, str],
-        stream: bool = True,
-        extended: bool = True,
-    ) -> httpx.Response:
-        """POST with extended timeout for thinking/reasoning models."""
-        last_error = None
-        # More retries for long-thinking models
-        retries = max(MAX_RETRIES, 2)
-
         for attempt in range(retries + 1):
             try:
                 timeout = self._timeout(extended=extended)
@@ -181,18 +127,18 @@ class NIMService:
                 if response.status_code in (502, 503, 504, 429):
                     last_error = f"HTTP {response.status_code}"
                     if attempt < retries:
-                        await asyncio.sleep(2 * (attempt + 1))  # Longer backoff for thinking models
+                        await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
                         continue
                 return response
             except httpx.TimeoutException as e:
-                last_error = f"Timeout after {timeout.connect_timeout}s: {e}"
+                last_error = f"Timeout: {e}"
                 if attempt < retries:
-                    await asyncio.sleep(2 * (attempt + 1))
+                    await asyncio.sleep(1 * (attempt + 1))
                     continue
             except httpx.HTTPError as e:
                 last_error = f"HTTP error: {e}"
                 if attempt < retries:
-                    await asyncio.sleep(2 * (attempt + 1))
+                    await asyncio.sleep(1 * (attempt + 1))
                     continue
         raise httpx.HTTPError(f"Failed after {retries + 1} attempts: {last_error}")
 
@@ -260,22 +206,13 @@ class NIMService:
             if is_thinking:
                 logger.info(f"Using extended timeout ({timeout.connect_timeout}s) for thinking model: {model}")
 
-            if is_thinking:
-                # For thinking models: use heartbeat wrapper for long requests
-                response = await self._post_with_retry_extended(
-                    f"{settings.nim_base_url}/chat/completions",
-                    json=stream_payload,
-                    headers=self._auth_headers_sse(),
-                    stream=True,
-                    extended=is_thinking,
-                )
-            else:
-                response = await self._post_with_retry(
-                    f"{settings.nim_base_url}/chat/completions",
-                    json=stream_payload,
-                    headers=self._auth_headers_sse(),
-                    stream=True,
-                )
+            response = await self._post_with_retry(
+                f"{settings.nim_base_url}/chat/completions",
+                json=stream_payload,
+                headers=self._auth_headers_sse(),
+                stream=True,
+                extended=is_thinking,
+            )
 
             if not (200 <= response.status_code < 300):
                 error_body = await response.aread()

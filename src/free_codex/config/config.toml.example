@@ -17,6 +17,11 @@ model_provider = "free_codex_nim"
 [model_providers.free_codex_nim]
 name = "Free Codex (local NIM proxy)"
 base_url = "http://127.0.0.1:8080/v1"
+# Use OpenAI's Responses API (POST /v1/responses) — the preferred unified
+# surface for agentic tool calling. Free Codex translates Responses ↔ Chat
+# Completions internally so it still works with NIM / Ollama / vLLM upstream.
+# `wire_api = "chat"` is no longer supported by Codex.
+wire_api = "responses"
 
 [windows]
 sandbox = "elevated"

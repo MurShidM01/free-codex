@@ -61,7 +61,14 @@ function showBanner(kind, msg) {
   const b = $("banner");
   b.hidden = false;
   b.className = kind === "err" ? BANNER_ERR : BANNER_OK;
-  b.textContent = msg;
+  const icon = document.createElement("span");
+  icon.className = "mr-2 text-lg";
+  icon.textContent = kind === "err" ? "✖" : "✔";
+  const text = document.createElement("span");
+  text.textContent = msg;
+  b.innerHTML = "";
+  b.appendChild(icon);
+  b.appendChild(text);
 }
 
 function hideBanner() {
@@ -70,6 +77,14 @@ function hideBanner() {
   b.textContent = "";
   b.className =
     "hidden rounded-xl border px-4 py-3 text-sm leading-relaxed font-medium";
+}
+
+function adjustEnvHeight() {
+  const env = $("env");
+  if (!env) return;
+  env.style.height = "auto";
+  const height = env.scrollHeight;
+  env.style.height = `${height}px`;
 }
 
 function hideListCountBadge() {
@@ -246,6 +261,41 @@ function nimPayload() {
   return o;
 }
 
+function buildUpdatedEnvContent(currentContent, base, apiKey, model) {
+  const required = {
+    NVIDIA_NIM_BASE_URL: base,
+    NVIDIA_NIM_API_KEY: apiKey,
+    NVIDIA_NIM_MODEL: model,
+  };
+  const lines = currentContent.split("\n");
+  const seen = new Set();
+  const outLines = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#") || !line.includes("=")) {
+      outLines.push(rawLine);
+      continue;
+    }
+    const [key, ...rest] = rawLine.split("=");
+    const name = key.trim();
+    if (Object.prototype.hasOwnProperty.call(required, name)) {
+      const value = required[name] ?? "";
+      outLines.push(`${name}=${value}`);
+      seen.add(name);
+    } else {
+      outLines.push(rawLine);
+    }
+  }
+
+  for (const [name, value] of Object.entries(required)) {
+    if (!seen.has(name)) {
+      outLines.push(`${name}=${value}`);
+    }
+  }
+  return outLines.join("\n");
+}
+
 function setValidationStyle(ok) {
   const v = $("validation");
   if (!v) return;
@@ -257,18 +307,35 @@ function setValidationStyle(ok) {
   v.classList.add(ok ? "border-emerald-500/40" : "border-red-500/45");
 }
 
+function setValidateBadge(text, success) {
+  const badge = $("validate-badge");
+  if (!badge) return;
+  badge.textContent = text;
+  badge.classList.toggle("hidden", false);
+  badge.classList.toggle("bg-emerald-500/25", success);
+  badge.classList.toggle("text-emerald-100", success);
+  badge.classList.toggle("ring-emerald-400/40", success);
+  badge.classList.toggle("bg-red-500/20", !success);
+  badge.classList.toggle("text-red-100", !success);
+  badge.classList.toggle("ring-red-400/40", !success);
+}
+
+function clearValidateBadge() {
+  const badge = $("validate-badge");
+  if (!badge) return;
+  badge.className =
+    "hidden rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200 ring-1 ring-slate-700";
+  badge.textContent = "";
+}
+
 async function loadEnv() {
   hideBanner();
   $("hint").textContent = "";
+  clearValidateBadge();
   try {
     const data = await fetchJSON("/admin/api/env");
     $("env").value = data.content || "";
-    const lines = (data.validation_errors || []).join("\n") || "(none)";
-    const validation = $("validation");
-    if (validation) {
-      validation.textContent = `validation_ok: ${data.validation_ok}\n${lines}`;
-    }
-    setValidationStyle(data.validation_ok);
+    adjustEnvHeight();
     if (data.masked) {
       showBanner(
         "ok",
@@ -286,7 +353,10 @@ async function saveEnv() {
   $("hint").textContent = "";
   await withBtn($("save"), async () => {
     try {
-      const body = JSON.stringify({ content: $("env").value });
+      const current = $("env").value;
+      const { base_url, api_key, model } = nimPayload();
+      const content = buildUpdatedEnvContent(current, base_url || "", api_key || "", model || "");
+      const body = JSON.stringify({ content });
       const data = await fetchJSON("/admin/api/env", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -295,6 +365,38 @@ async function saveEnv() {
       showBanner("ok", data.hint || "Saved successfully.");
       await loadEnv();
     } catch (e) {
+      const detail = e.body?.detail || e.body?.validation_errors || e.message;
+      showBanner(
+        "err",
+        typeof detail === "object" ? JSON.stringify(detail) : detail
+      );
+    }
+  });
+}
+
+async function validateEnv() {
+  hideBanner();
+  $("hint").textContent = "";
+  clearValidateBadge();
+  await withBtn($("validate"), async () => {
+    try {
+      const current = $("env").value;
+      const { base_url, api_key, model } = nimPayload();
+      const content = buildUpdatedEnvContent(current, base_url || "", api_key || "", model || "");
+      const data = await fetchJSON("/admin/api/env/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (data.ok) {
+        setValidateBadge("Valid", true);
+        showBanner("ok", "File is valid.");
+      } else {
+        setValidateBadge("Invalid", false);
+        showBanner("err", "File is not valid.");
+      }
+    } catch (e) {
+      setValidateBadge("Error", false);
       const detail = e.body?.detail || e.body?.validation_errors || e.message;
       showBanner(
         "err",
@@ -338,11 +440,37 @@ async function nimTestChat() {
   });
 }
 
+async function copyEnv() {
+  const text = $("env").value;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      textarea.style.top = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+    showBanner("ok", "Environment content copied to clipboard.");
+  } catch (e) {
+    showBanner("err", "Unable to copy environment content.");
+  }
+}
+
 $("reload").addEventListener("click", () => withBtn($("reload"), loadEnv));
 $("unlock").addEventListener("click", () => withBtn($("unlock"), loadEnv));
 $("save").addEventListener("click", saveEnv);
+$("validate").addEventListener("click", validateEnv);
+$("copy-env").addEventListener("click", copyEnv);
 $("nim-list").addEventListener("click", nimListModels);
 $("nim-test").addEventListener("click", nimTestChat);
+window.addEventListener("resize", adjustEnvHeight);
 
 loadEnv();
 

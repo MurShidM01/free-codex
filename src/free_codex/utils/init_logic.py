@@ -18,10 +18,19 @@ model_provider = "free_codex_nim"
 [model_providers.free_codex_nim]
 name = "Free Codex (local NIM proxy)"
 base_url = "http://127.0.0.1:8080/v1"
+# Prefer the unified Responses API for agentic tool calling. Free Codex
+# bridges /v1/responses to upstream /v1/chat/completions internally so this
+# works against NIM, Ollama, vLLM, etc.
+wire_api = "responses"
 
 [windows]
 sandbox = "elevated"
 """
+
+
+def _codex_config_path() -> Path:
+    """Get the Codex extension config path (~/.codex/config.toml)."""
+    return Path.home() / ".codex" / "config.toml"
 
 
 def fc_init() -> None:
@@ -67,7 +76,23 @@ def fc_init() -> None:
         print(f"config.toml already exists at {config_dst} — skipping config init.")
         print("To re-initialize, delete the file and run fc-init again.")
         print(f"Codex will use CODEX_HOME={root.resolve()} when launched via fc-codex.")
-        return
+
+    # Also create symlink/copy for Codex VS Code extension (~/.codex/config.toml)
+    codex_config = _codex_config_path()
+    if config_dst.exists():
+        try:
+            if not codex_config.exists():
+                # Create ~/.codex directory if needed
+                codex_config.parent.mkdir(parents=True, exist_ok=True)
+                # Copy config to Codex extension location
+                shutil.copy(config_dst, codex_config)
+                print(f"Copied config to Codex extension location: {codex_config}")
+            else:
+                print(f"Codex extension config already exists at {codex_config}")
+        except Exception as e:
+            print(f"Note: Could not copy to {codex_config}: {e}")
+            print("For VS Code extension, manually copy it with:")
+            print(f"  copy {config_dst} {codex_config}")
 
     if config_dst.exists():
         raw = config_dst.read_text(encoding="utf-8")
@@ -78,5 +103,13 @@ def fc_init() -> None:
         print(
             f"Set Codex model to {model_slug!r} and proxy provider in {config_dst}"
         )
+        # Also update the VS Code extension config if it exists
+        if codex_config.exists():
+            try:
+                shutil.copy(config_dst, codex_config)
+                print(f"Updated Codex extension config at {codex_config}")
+            except Exception:
+                pass
 
     print("Codex will use CODEX_HOME=" + str(root.resolve()) + " when launched via fc-codex.")
+    print(f"For VS Code extension, config is ready at: {codex_config}")

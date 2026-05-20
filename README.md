@@ -82,6 +82,9 @@ fc-server
 fc-codex
 ```
 
+When you run `fc-init`, Free Codex writes the local Codex config so the client uses
+`wire_api = "responses"` and sends agentic calls to `/v1/responses` on the proxy.
+
 ---
 
 ## Configuration
@@ -111,7 +114,7 @@ Access the web-based admin panel at `http://127.0.0.1:8080/admin`:
 
 ## VS Code Extension Compatibility
 
-Free Codex works with the **official OpenAI Codex VS Code extension**. Configure it to use Free Codex as the backend.
+Free Codex works with the **official OpenAI Codex VS Code extension**. The extension reads authentication from `~/.codex/config.toml`.
 
 ### Setup
 
@@ -122,73 +125,57 @@ Free Codex works with the **official OpenAI Codex VS Code extension**. Configure
 fc-server
 ```
 
-2. **Configure VS Code Settings**
+2. **Initialize Free Codex (creates config for VS Code extension)**
 
-Add the following to your VS Code `settings.json` (File → Preferences → Settings → Open JSON):
-
-#### Codex Extension Settings (Official OpenAI Codex)
-
-```json
-{
-    "codex.apiBaseUrl": "http://localhost:8080/v1",
-    "codex.apiKey": "freecodex",
-    "codex.url": "http://127.0.0.1:8080"
-}
+```bash
+fc-init
 ```
 
-Or alternative format:
+This automatically creates `~/.codex/config.toml` which the VS Code extension reads for authentication.
 
-```json
-{
-    "codex": {
-        "apiBaseUrl": "http://localhost:8080/v1",
-        "apiKey": "freecodex",
-        "url": "http://127.0.0.1:8080"
-    }
-}
+3. **Open Codex VS Code Extension**
+
+The extension will automatically use the config from `~/.codex/config.toml` — no login required!
+
+### Why This Works
+
+The Codex VS Code extension reads its API configuration from `~/.codex/config.toml`. When you run `fc-init`, Free Codex automatically creates this file with the correct settings pointing to your local Free Codex server.
+
+By default, the generated config now declares `wire_api = "responses"`, so the extension uses the OpenAI Responses API format against the proxy at `/v1/responses`.
+
+### Manual Setup (if needed)
+
+If the automatic setup doesn't work, manually copy the config:
+
+**Windows:**
+```powershell
+copy $env:USERPROFILE\.config\free-codex\config.toml $env:USERPROFILE\.codex\config.toml
 ```
 
-### For ChatGPT for VS Code Extension (Kilo Code, etc.)
-
-```json
-{
-    "chatgpt.cliExecutable": "codex",
-    "chatgpt.env": {
-        "OPENAI_BASE_URL": "http://localhost:8080",
-        "OPENAI_API_KEY": "freecodex"
-    }
-}
+**Linux/Mac:**
+```bash
+cp ~/.config/free-codex/config.toml ~/.codex/config.toml
 ```
 
-### Environment Variables Explained
+### After fc-init
 
-| Variable | Value | Description |
-|----------|-------|-------------|
-| `OPENAI_BASE_URL` | `http://localhost:8080` | Free Codex proxy URL |
-| `OPENAI_API_KEY` | `freecodex` | Dummy key (Free Codex accepts any value) |
-| `apiBaseUrl` | `http://localhost:8080/v1` | Codex extension API base URL |
-| `apiKey` | `freecodex` | Authentication key |
-
-### Custom Port
-
-If you changed the default port (8080), update the URL accordingly:
-
-```json
-{
-    "codex.apiBaseUrl": "http://localhost:YOUR_PORT/v1",
-    "codex.url": "http://127.0.0.1:YOUR_PORT"
-}
+You should see output like:
+```
+Copied config to Codex extension location: C:\Users\YourUser\.codex\config.toml
 ```
 
-### Remote Server
+### No API Key Required
 
-For connecting to a Free Codex server on another machine:
+With the config file in place, the Codex VS Code extension works without entering any API key or login — it uses the proxy configuration directly.
+
+### VS Code Settings (Optional)
+
+You can also add these for better experience:
 
 ```json
 {
-    "codex.apiBaseUrl": "http://192.168.1.100:8080/v1",
-    "codex.apiKey": "freecodex",
-    "codex.url": "http://192.168.1.100:8080"
+    "claudeCode.preferredLocation": "panel",
+    "workbench.colorTheme": "Light Modern"
 }
 ```
 
@@ -208,12 +195,14 @@ For complex tasks, long files, or reasoning/thinking models:
 | `FREE_CODEX_SSE_HEARTBEAT_SECS` | `25` | Keep-alive interval (0 to disable) |
 
 ```env
-# For thinking/reasoning models (DeepSeek, Qwen3, etc.)
-FREE_CODEX_READ_TIMEOUT=600
+# For thinking/reasoning and heavy models like glm-5.1 or deepseek-v4-pro
+FREE_CODEX_READ_TIMEOUT=900
 FREE_CODEX_CONNECT_TIMEOUT=60
-FREE_CODEX_MAX_RETRIES=4
-FREE_CODEX_SSE_HEARTBEAT_SECS=25
+FREE_CODEX_MAX_RETRIES=5
+FREE_CODEX_SSE_HEARTBEAT_SECS=20
 ```
+
+Free Codex now defaults NIM timeouts based on the provider preset, so NIM users get longer read/connect defaults without needing to set env vars.
 
 ### Workspace Context Settings
 
@@ -307,8 +296,9 @@ NVIDIA_NIM_MODEL=your-model
 
 Free Codex acts as a transparent proxy:
 1. Codex sends requests to `http://127.0.0.1:8080`
-2. Free Codex forwards to your configured provider
-3. Responses stream back to Codex in real-time
+2. The configured `wire_api = "responses"` makes Codex use the `/v1/responses` endpoint
+3. Free Codex forwards the request to your provider and translates between Responses and Chat Completions as needed
+4. Responses stream back to Codex in real-time
 
 ---
 

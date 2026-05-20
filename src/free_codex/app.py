@@ -138,8 +138,8 @@ def create_app() -> FastAPI:
     async def lifespan(app: FastAPI):
         logger.info("Starting Free Codex server...")
         app.state.http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(120.0, connect=10.0),
-            limits=httpx.Limits(max_keepalive_connections=32, max_connections=100),
+            timeout=httpx.Timeout(settings.read_timeout, connect=settings.connect_timeout),
+            limits=httpx.Limits(max_keepalive_connections=64, max_connections=256),
         )
 
         # Load cache on startup
