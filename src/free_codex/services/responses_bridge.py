@@ -1,4 +1,4 @@
-"""Translate between OpenAI Responses API and Chat Completions (NIM)."""
+"""Shared translation between OpenAI Responses API and Chat Completions."""
 
 from __future__ import annotations
 
@@ -66,11 +66,23 @@ def chat_payload_from_responses_request(
         "user",
         "tools",
         "tool_choice",
+        "parallel_tool_calls",
         "response_format",
+        "metadata",
+        "previous_response_id",
+        "reasoning",
+        "reasoning_effort",
     )
     for k in mirror:
         if k in body and body[k] is not None:
             payload[k] = body[k]
+
+    # Responses API places structured output under `text.format`; compatible
+    # Chat transports use `response_format`.
+    if payload.get("response_format") is None:
+        text_cfg = body.get("text")
+        if isinstance(text_cfg, dict) and isinstance(text_cfg.get("format"), dict):
+            payload["response_format"] = text_cfg["format"]
 
     if body.get("max_output_tokens") is not None:
         payload["max_tokens"] = body["max_output_tokens"]
@@ -95,12 +107,13 @@ def response_skeleton(
         "max_output_tokens": req_body.get("max_output_tokens"),
         "model": displayed_model,
         "output": [],
-        "parallel_tool_calls": True,
-        "previous_response_id": None,
-        "reasoning": {"effort": None, "summary": None},
+        "parallel_tool_calls": req_body.get("parallel_tool_calls", True),
+        "previous_response_id": req_body.get("previous_response_id"),
+        # Do not fabricate reasoning summaries when an upstream does not return them.
+        "reasoning": req_body.get("reasoning"),
         "store": req_body.get("store", True),
         "temperature": req_body.get("temperature", 1.0),
-        "text": {"format": {"type": "text"}},
+        "text": req_body.get("text") or {"format": {"type": "text"}},
         "tool_choice": req_body.get("tool_choice") or "auto",
         "tools": req_body.get("tools") or [],
         "top_p": req_body.get("top_p", 1.0),
@@ -150,12 +163,13 @@ def build_completed_response(
         "max_output_tokens": req_body.get("max_output_tokens"),
         "model": model,
         "output": output,
-        "parallel_tool_calls": True,
-        "previous_response_id": None,
-        "reasoning": {"effort": None, "summary": None},
+        "parallel_tool_calls": req_body.get("parallel_tool_calls", True),
+        "previous_response_id": req_body.get("previous_response_id"),
+        # Do not fabricate reasoning summaries when an upstream does not return them.
+        "reasoning": req_body.get("reasoning"),
         "store": req_body.get("store", True),
         "temperature": req_body.get("temperature", 1.0),
-        "text": {"format": {"type": "text"}},
+        "text": req_body.get("text") or {"format": {"type": "text"}},
         "tool_choice": req_body.get("tool_choice") or "auto",
         "tools": req_body.get("tools") or [],
         "top_p": req_body.get("top_p", 1.0),

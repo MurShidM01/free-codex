@@ -100,6 +100,7 @@ async def stream_responses_body(
     role_detected: str | None = None
     tool_calls_in_progress: dict[int, dict[str, Any]] = {}
     current_output_index = 0
+    message_started = False
 
     async for ev in iter_openai_chat_sse(nim_bytes):
         if ev.get("done"):
@@ -108,15 +109,20 @@ async def stream_responses_body(
         # Handle errors
         if "error" in ev:
             msg = _upstream_error_message(ev["error"])
+            failed = dict(skeleton)
+            failed["status"] = "failed"
+            failed["error"] = {"type": "upstream_error", "message": msg}
             yield encode_sse(
                 "error",
                 {
                     "type": "error",
-                    "error": {
-                        "type": "upstream_error",
-                        "message": msg,
-                    },
+                    "sequence_number": seq.next(),
+                    "error": {"type": "upstream_error", "message": msg},
                 },
+            )
+            yield encode_sse(
+                "response.failed",
+                {"type": "response.failed", "sequence_number": seq.next(), "response": failed},
             )
             return
 
@@ -138,6 +144,17 @@ async def stream_responses_body(
                 if content:
                     if isinstance(content, str):
                         full_text_parts.append(content)
+                        if not message_started:
+                            message_started = True
+                            yield encode_sse(
+                                "response.output_item.added",
+                                {
+                                    "type": "response.output_item.added",
+                                    "output_index": current_output_index,
+                                    "sequence_number": seq.next(),
+                                    "item": {"id": msg_id, "type": "message", "status": "in_progress", "role": role_detected or "assistant", "content": []},
+                                },
+                            )
 
                         # Emit content delta with proper chunking
                         async for piece in iter_text_deltas(content):
@@ -160,6 +177,17 @@ async def stream_responses_body(
                                 block_text = block.get("text", "")
                                 if block_type == "text" and block_text:
                                     full_text_parts.append(block_text)
+                                    if not message_started:
+                                        message_started = True
+                                        yield encode_sse(
+                                            "response.output_item.added",
+                                            {
+                                                "type": "response.output_item.added",
+                                                "output_index": current_output_index,
+                                                "sequence_number": seq.next(),
+                                                "item": {"id": msg_id, "type": "message", "status": "in_progress", "role": role_detected or "assistant", "content": []},
+                                            },
+                                        )
                                     async for piece in iter_text_deltas(block_text):
                                         yield encode_sse(
                                             "response.output_text.delta",
@@ -200,8 +228,9 @@ async def stream_responses_body(
 
                 index = tc.get("index", 0)
                 tc_id = tc.get("id", "")
-                tc_name = tc.get("name", "")
-                tc_args = tc.get("arguments", "")
+                fn = tc.get("function") if isinstance(tc.get("function"), dict) else {}
+                tc_name = tc.get("name", fn.get("name", ""))
+                tc_args = tc.get("arguments", fn.get("arguments", ""))
 
                 # Initialize tool call if new
                 if index not in tool_calls_in_progress:
@@ -217,7 +246,7 @@ async def stream_responses_body(
                         "response.output_item.added",
                         {
                             "type": "response.output_item.added",
-                            "output_index": seq.next(),
+                            "output_index": int(index),
                             "sequence_number": seq.next(),
                             "item": {
                                 "id": fc_id,
@@ -326,8 +355,22 @@ async def stream_responses_body(
                 },
             )
 
-    # Build final response
+    # Build final response. Keep tool call IDs/arguments stable in the final
+    # object as well as in delta events so Codex can submit tool results.
     cc = {"usage": usage_obj} if usage_obj else {}
+    final_output = None
+    if tool_calls_in_progress:
+        final_output = [
+            {
+                "id": tc_data["id"],
+                "type": "function_call",
+                "call_id": tc_data["call_id"],
+                "name": tc_data["name"],
+                "arguments": tc_data["arguments"],
+                "status": "completed",
+            }
+            for _, tc_data in sorted(tool_calls_in_progress.items())
+        ]
     final = build_completed_response(
         resp_id=resp_id,
         msg_id=msg_id,
@@ -335,6 +378,7 @@ async def stream_responses_body(
         req_body=req_body,
         assistant_text=merged_text,
         cc=cc,
+        output=final_output,
     )
     yield encode_sse(
         "response.completed",

@@ -1,0 +1,65 @@
+# Free Codex OmniRoute provider configuration.
+# This file is read by fc-server; Codex itself still points only to
+# http://127.0.0.1:8080/v1 through config.toml.
+
+[routing]
+# nvidia | ollama | local | custom_openai | puter_web, or a custom [providers.*] id
+default_provider = "nvidia"
+# Route individual client model names/aliases without changing Codex base_url.
+# model_routes = { "puter/deepseek-flash" = "puter_web::deepseek/deepseek-v4.1-flash" }
+# aliases = { "puter/qwen-cyber" = "puter_web::qwen/qwen3.8-27b-abliterated-cyber:free" }
+# fallback_providers = ["ollama"]
+sticky_sessions = true
+
+# NVIDIA remains fully compatible with NVIDIA_NIM_BASE_URL/API_KEY/MODEL in .env.
+[providers.nvidia]
+type = "nvidia_nim"
+enabled = true
+# default_model is inherited from NVIDIA_NIM_MODEL when omitted.
+
+[providers.ollama]
+type = "ollama"
+enabled = false
+base_url = "http://127.0.0.1:11434/v1"
+default_model = "llama3.2"
+# api_key_env = "OLLAMA_API_KEY"
+
+[providers.local]
+type = "local"
+enabled = false
+# base_url = "http://127.0.0.1:8000/v1"
+# default_model = "your-local-model"
+
+[providers.custom_openai]
+type = "custom_openai"
+enabled = false
+# base_url = "https://example.invalid/v1"
+# api_key_env = "CUSTOM_OPENAI_API_KEY"
+# default_model = "your-model"
+
+[providers.puter_web]
+type = "puter_web"
+enabled = false
+# This is a Puter.js browser runtime, NOT Puter's paid OpenAI-compatible endpoint.
+default_model = "deepseek/deepseek-v4.1-flash"
+headless = true
+browser = "chromium"
+max_concurrent_requests = 1
+# profile_dir = "~/.config/free-codex/puter-profile"
+
+# Declare only model capabilities you have verified with the documented
+# Puter.js path. Image/video are false unless explicitly enabled here.
+[providers.puter_web.model_capabilities."deepseek/deepseek-v4.1-flash"]
+text_input = true
+streaming = true
+tool_calling = true
+parallel_tool_calls = true
+image_input = false
+video_input = false
+structured_output = false
+reasoning = false
+provider_notes = "Verify optional modalities against your Puter model before enabling them."
+
+[providers.puter_web.aliases]
+"puter/deepseek-flash" = "deepseek/deepseek-v4.1-flash"
+"puter/qwen-cyber" = "qwen/qwen3.8-27b-abliterated-cyber:free"

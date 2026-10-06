@@ -52,12 +52,17 @@ def parse_dotenv_lines(content: str) -> dict[str, str]:
 
 def validation_errors(parsed: dict[str, str]) -> list[str]:
     errs: list[str] = []
-    for k in REQUIRED_NIM_KEYS:
-        if not (parsed.get(k) or "").strip():
-            errs.append(f"Missing or empty: {k}")
-    url = (parsed.get("NVIDIA_NIM_BASE_URL") or "").strip()
-    if url and not (url.startswith("http://") or url.startswith("https://")):
-        errs.append("NVIDIA_NIM_BASE_URL must start with http:// or https://")
+    selected = (parsed.get("FREE_CODEX_DEFAULT_PROVIDER") or "nvidia").strip().lower().replace("-", "_")
+    # Preserve the legacy NIM validation workflow while allowing a first-class
+    # non-NIM default (notably browser-mediated Puter Web) to be configured
+    # without fake NVIDIA credentials.
+    if selected in ("", "nvidia", "nvidia_nim", "nim"):
+        for k in REQUIRED_NIM_KEYS:
+            if not (parsed.get(k) or "").strip():
+                errs.append(f"Missing or empty: {k}")
+        url = (parsed.get("NVIDIA_NIM_BASE_URL") or "").strip()
+        if url and not (url.startswith("http://") or url.startswith("https://")):
+            errs.append("NVIDIA_NIM_BASE_URL must start with http:// or https://")
     return errs
 
 

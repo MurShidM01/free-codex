@@ -15,12 +15,20 @@ dependencies = [
     "python-dotenv",
     "pydantic",
     "sqlite-utils>=3.38",
+    "tomli; python_version < '3.11'",
 ]
+
+[project.optional-dependencies]
+# Browser automation is optional so NVIDIA/Ollama/custom providers keep working
+# on minimal installations. Install with: pip install 'free-codex[puter]'.
+puter = ["playwright>=1.40"]
 
 [project.scripts]
 fc-init = "free_codex.cli:fc_init"
 fc-server = "free_codex.cli:run_server"
 fc-codex = "free_codex.cli:run_codex"
+fc-puter-auth = "free_codex.cli_puter:run_puter_auth"
+fc-puter-login = "free_codex.cli_puter:run_puter_auth"
 
 [build-system]
 requires = ["hatchling"]
@@ -34,6 +42,7 @@ packages = ["src/free_codex"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/free_codex/static" = "free_codex/static"
+"src/free_codex/config" = "free_codex/config"
 
 [tool.uv]
 default-groups = ["dev"]

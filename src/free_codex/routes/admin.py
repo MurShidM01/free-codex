@@ -70,12 +70,21 @@ async def api_env_post(request: Request, body: EnvSaveBody) -> JSONResponse:
         raise HTTPException(status_code=400, detail={"validation_errors": errs})
 
     write_dotenv_file(body.content)
-    # Reload settings to pick up changes without restart
+    # Reload settings to pick up changes without restart.
     settings.reload()
-    # Sync model to codex config.toml for CLI
+    # Sync selected local routing model to Codex config.toml for CLI. The
+    # external client still points only at Free Codex's local base URL.
     parsed = parse_dotenv_lines(body.content)
-    model = (parsed.get("NVIDIA_NIM_MODEL") or "").strip()
+    provider = (parsed.get("FREE_CODEX_DEFAULT_PROVIDER") or "nvidia").strip().lower().replace("-", "_")
+    model_keys = {
+        "nvidia": "NVIDIA_NIM_MODEL", "nvidia_nim": "NVIDIA_NIM_MODEL",
+        "ollama": "OLLAMA_MODEL", "local": "LOCAL_OPENAI_MODEL",
+        "custom_openai": "CUSTOM_OPENAI_MODEL", "puter_web": "PUTER_WEB_MODEL",
+    }
+    model = (parsed.get(model_keys.get(provider, "NVIDIA_NIM_MODEL")) or "").strip()
     if model:
+        from ..utils.init_logic import routed_model
+        model = routed_model(provider, model)
         cfg_path = free_codex_config_toml()
         if cfg_path.exists():
             try:
@@ -87,7 +96,14 @@ async def api_env_post(request: Request, body: EnvSaveBody) -> JSONResponse:
         else:
             logger.warning(f"Codex config.toml not found at {cfg_path}, skipping model sync")
     else:
-        logger.info("No NVIDIA_NIM_MODEL set in .env; config.toml unchanged")
+        logger.info("No selected provider model set in .env; config.toml unchanged")
+
+    provider_router = getattr(request.app.state, "provider_router", None)
+    if provider_router is not None:
+        try:
+            await provider_router.reload_configuration()
+        except Exception as exc:
+            logger.warning(f"Provider router reload failed: {exc}")
 
     return JSONResponse(
         {

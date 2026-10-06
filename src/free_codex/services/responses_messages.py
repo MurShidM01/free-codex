@@ -47,6 +47,20 @@ def normalize_one_item(item: dict[str, Any]) -> dict[str, Any] | None:
         txt = item.get("text") or ""
         return {"role": role, "content": txt}
 
+    if ctype in ("input_image", "image_url"):
+        source = item.get("image_url") or item.get("url") or item.get("image_bytes")
+        if isinstance(source, dict):
+            source = source.get("url")
+        if source:
+            return {"role": role, "content": [{"type": "image_url", "image_url": {"url": source}}]}
+
+    if ctype in ("input_video", "video_url"):
+        source = item.get("video_url") or item.get("url") or item.get("video_bytes")
+        if isinstance(source, dict):
+            source = source.get("url")
+        if source:
+            return {"role": role, "content": [{"type": "video_url", "video_url": {"url": source}}]}
+
     raw_content = item.get("content")
 
     if isinstance(raw_content, str):
@@ -64,25 +78,56 @@ def normalize_one_item(item: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def flatten_parts(parts: list[Any], role_for_media: str) -> str:
+def flatten_parts(parts: list[Any], role_for_media: str) -> Any:
+    """Preserve supported multimodal blocks for the selected provider.
+
+    Older NIM-only code flattened images into a placeholder before routing. That
+    made it impossible for a capable provider (including a configured Puter
+    model) to receive an image. The provider router now rejects unsupported
+    media explicitly and the provider-specific normalizer decides its native
+    shape.
+    """
     texts: list[str] = []
+    blocks: list[dict[str, Any]] = []
     for p in parts:
         if not isinstance(p, dict):
             texts.append(str(p))
             continue
         pt = p.get("type")
         if pt in ("input_text", "output_text", "text"):
-            texts.append(p.get("text") or "")
-        elif pt in ("input_image", "input_file"):
-            texts.append("")  # NIM shim: skip binary / URL references
+            text = p.get("text") or ""
+            if text:
+                texts.append(str(text))
+        elif pt in ("input_image", "image_url"):
+            source = p.get("image_url") or p.get("url") or p.get("image_bytes")
+            if isinstance(source, dict):
+                source = source.get("url")
+            if source:
+                blocks.append({"type": "image_url", "image_url": {"url": source}})
+        elif pt in ("input_video", "video_url"):
+            source = p.get("video_url") or p.get("url") or p.get("video_bytes")
+            if isinstance(source, dict):
+                source = source.get("url")
+            if source:
+                blocks.append({"type": "video_url", "video_url": {"url": source}})
+        elif pt == "input_file":
+            # File references stay visible to provider capability validation;
+            # text-only transports will return an explicit unsupported error.
+            source = p.get("file_url") or p.get("url") or p.get("file_id")
+            if source:
+                blocks.append({"type": "input_file", "file_url": source})
         elif pt == "reasoning":
-            texts.append("")  # drop reasoning blocks from NIM payloads
+            # Reasoning is model output, never silently replay it as input.
+            continue
         else:
-            # Unknown structure (e.g. future Codex item types): best-effort
             texts.append(str(p))
     merged = "".join(part for part in texts if part)
+    if not blocks:
+        if merged:
+            return merged
+        return "" if role_for_media == "assistant" else "[unsupported input item omitted by free-codex proxy]"
+    content: list[dict[str, Any]] = []
     if merged:
-        return merged
-    if role_for_media == "assistant":
-        return ""
-    return "[unsupported input item omitted by free-codex proxy]"
+        content.append({"type": "text", "text": merged})
+    content.extend(blocks)
+    return content
