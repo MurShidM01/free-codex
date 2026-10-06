@@ -106,13 +106,12 @@ class NIMService:
             try:
                 timeout = self._timeout(extended=extended)
                 if stream:
-                    response = await self.client.stream(
-                        "POST",
-                        url,
-                        json=json,
-                        headers=headers,
-                        timeout=timeout,
-                    )
+                    # httpx.AsyncClient.stream() is an async context manager,
+                    # not an awaitable response. Build/send explicitly so the
+                    # caller can consume and close the response generator.
+                    req = self.client.build_request("POST", url, json=json, headers=headers)
+                    req.extensions["timeout"] = timeout.as_dict()
+                    response = await self.client.send(req, stream=True)
                 else:
                     response = await self.client.post(
                         url,
@@ -162,7 +161,8 @@ class NIMService:
             "model", "messages", "temperature", "top_p", "n", "stream",
             "stop", "max_tokens", "presence_penalty", "frequency_penalty",
             "logit_bias", "user", "tools", "tool_choice", "functions",
-            "function_call", "seed", "response_format", "tools",
+            "function_call", "seed", "response_format", "tools", "parallel_tool_calls",
+            "reasoning_effort", "thinking", "metadata",
         }
         payload = {k: v for k, v in payload.items() if k in standard_params or v is not None}
 
@@ -199,6 +199,7 @@ class NIMService:
 
         stream_payload = dict(payload)
         stream_payload["stream"] = True
+        response: Optional[httpx.Response] = None
 
         try:
             # Use extended timeout if this is a thinking/reasoning model
@@ -257,6 +258,9 @@ class NIMService:
             logger.error(f"Unexpected stream error: {e}")
             yield await yield_error_sse(f"Stream error: {str(e)}", "stream_error")
             yield b"data: [DONE]\n\n"
+        finally:
+            if response is not None:
+                await response.aclose()
 
     async def get_completion(self, request: CompletionRequest) -> Dict[str, Any]:
         """Send a non-streaming text completion request."""
@@ -286,6 +290,7 @@ class NIMService:
 
         stream_payload = dict(payload)
         stream_payload["stream"] = True
+        response: Optional[httpx.Response] = None
 
         try:
             response = await self._post_with_retry(
@@ -328,6 +333,9 @@ class NIMService:
             logger.error(f"Unexpected completion stream error: {e}")
             yield await yield_error_sse(f"Stream error: {str(e)}", "stream_error")
             yield b"data: [DONE]\n\n"
+        finally:
+            if response is not None:
+                await response.aclose()
 
     async def post_chat_completions_payload(
         self, payload: Dict[str, Any]
@@ -354,6 +362,7 @@ class NIMService:
         """Stream from a raw payload dict with retries."""
         p = self._prepare_payload(dict(payload))
         p["stream"] = True
+        response: Optional[httpx.Response] = None
 
         try:
             response = await self._post_with_retry(
@@ -396,3 +405,6 @@ class NIMService:
             logger.error(f"Unexpected payload stream error: {e}")
             yield await yield_error_sse(f"Stream error: {str(e)}", "stream_error")
             yield b"data: [DONE]\n\n"
+        finally:
+            if response is not None:
+                await response.aclose()

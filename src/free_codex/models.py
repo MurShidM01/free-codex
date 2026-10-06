@@ -31,6 +31,13 @@ class ChatCompletionRequest(BaseModel):
     reasoning_effort: Optional[str] = None
     thinking: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
+    # Free Codex routing extension. It is consumed locally and never forwarded
+    # to an upstream OpenAI-compatible endpoint.
+    provider: Optional[str] = None
+    parallel_tool_calls: Optional[bool] = None
+    response_format: Optional[Dict[str, Any]] = None
+    max_completion_tokens: Optional[int] = None
+    stream_options: Optional[Dict[str, Any]] = None
 
 class CompletionRequest(BaseModel):
     model: str
@@ -51,6 +58,7 @@ class CompletionRequest(BaseModel):
     user: Optional[str] = None
     seed: Optional[int] = None
     metadata: Optional[Dict[str, Any]] = None
+    provider: Optional[str] = None
 
 class ModelInfo(BaseModel):
     id: str

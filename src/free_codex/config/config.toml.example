@@ -1,26 +1,26 @@
 #:schema https://developers.openai.com/codex/config-schema.json
 #
-# Free Codex — NVIDIA NIM via local proxy (fc-server).
+# Free Codex local OmniRoute proxy (fc-server).
 #
-# The model name below should match NVIDIA_NIM_MODEL in your .env file.
-# Run 'fc-init' to set this up automatically.
-# Use 'fc-admin' to configure NVIDIA credentials and model via web UI.
-#
-# NVIDIA credentials live in ~/.config/free-codex/.env (see fc-init / env.example).
+# Codex/VS Code always talks only to this local endpoint. Choose NVIDIA, Ollama,
+# custom OpenAI-compatible providers, or Puter Web in Free Codex configuration;
+# do not put upstream credentials or upstream URLs in this file.
 
-# Model ID - must match NVIDIA_NIM_MODEL in ~/.config/free-codex/.env
+# This can be a configured alias, e.g. puter/deepseek-flash. fc-init or
+# fc-codex --provider/--model can choose a model without changing base_url.
 model = "minimaxai/minimax-m2.7"
+model_provider = "free_codex"
 
-# Provider alias (registered below)
-model_provider = "free_codex_nim"
-
-[model_providers.free_codex_nim]
-name = "Free Codex (local NIM proxy)"
+[model_providers.free_codex]
+name = "Free Codex (local OmniRoute proxy)"
 base_url = "http://127.0.0.1:8080/v1"
-# Use OpenAI's Responses API (POST /v1/responses) — the preferred unified
-# surface for agentic tool calling. Free Codex translates Responses ↔ Chat
-# Completions internally so it still works with NIM / Ollama / vLLM upstream.
-# `wire_api = "chat"` is no longer supported by Codex.
+# Preferred agentic surface: POST /v1/responses.
+wire_api = "responses"
+
+# Legacy provider ID retained for older Codex config files.
+[model_providers.free_codex_nim]
+name = "Free Codex (local provider router; legacy NIM alias)"
+base_url = "http://127.0.0.1:8080/v1"
 wire_api = "responses"
 
 [windows]

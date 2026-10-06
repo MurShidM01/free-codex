@@ -10,6 +10,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from ..utils.config import settings
+from ..providers.base import ProviderError
+from .chat import get_provider_router
 
 logger = logging.getLogger("free-codex.embeddings")
 
@@ -73,15 +75,38 @@ async def create_embeddings(
             }
         )
 
-    model = body.get("model", settings.nim_model)
+    requested_model = body.get("model", "")
     encoding_format = body.get("encoding_format", "float")
     dimensions = body.get("dimensions") or 1536
 
-    base_url = settings.nim_base_url
-    client = request.app.state.http_client
-
-    # Try NIM embeddings first
+    # Select the same upstream router used by Responses/Chat. Providers that
+    # do not advertise embeddings simply fall back to the documented local
+    # pseudo-embedding compatibility behavior below.
+    provider_router = await get_provider_router(request)
     try:
+        selection = provider_router.select(
+            body=body, requested_model=str(requested_model or ""), headers=dict(request.headers)
+        )
+        model = selection.model
+        provider = selection.provider
+        base_url = getattr(provider, "base_url", "")
+        headers = provider._headers() if hasattr(provider, "_headers") else {"Content-Type": "application/json"}
+    except (ProviderError, ValueError):
+        selection = None
+        model = str(requested_model or "free-codex-pseudo-embedding")
+        base_url = ""
+        headers = {"Content-Type": "application/json"}
+    client = getattr(request.app.state, "http_client", None)
+    if client is None:
+        import httpx
+        client = httpx.AsyncClient(timeout=60.0)
+        request.app.state.http_client = client
+        provider_router.attach_client(client)
+
+    # Try the selected OpenAI-compatible provider embeddings endpoint first.
+    try:
+        if not base_url:
+            raise RuntimeError("Selected provider has no OpenAI embeddings endpoint")
         embeddings_url = f"{base_url.rstrip('/')}/embeddings"
         payload = {
             "input": input_texts,
@@ -94,10 +119,7 @@ async def create_embeddings(
         response = await client.post(
             embeddings_url,
             json=payload,
-            headers={
-                "Authorization": f"Bearer {settings.nim_api_key}",
-                "Content-Type": "application/json",
-            },
+            headers=headers,
             timeout=60.0,
         )
 

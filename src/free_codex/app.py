@@ -133,14 +133,26 @@ _rate_limiter = RateLimiter(
 
 def create_app() -> FastAPI:
     app_state: dict = {}
+    # Factory callers/tests may change environment/provider TOML between app
+    # instances; rebuild the lazy settings view before constructing the router.
+    settings.reload()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info("Starting Free Codex server...")
-        app.state.http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(settings.read_timeout, connect=settings.connect_timeout),
-            limits=httpx.Limits(max_keepalive_connections=64, max_connections=256),
+        if getattr(app.state, "http_client", None) is None:
+            app.state.http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(settings.read_timeout, connect=settings.connect_timeout),
+                limits=httpx.Limits(max_keepalive_connections=64, max_connections=256),
+            )
+        # The router is created before lifespan too, so TestClient/admin routes
+        # can inspect configured providers without starting a browser. Attach
+        # the shared transport only once the application is running.
+        app.state.provider_router.attach_client(app.state.http_client)
+        app.state.provider_router.set_bridge_base_url(
+            "http://127.0.0.1:{0}".format(settings.server_port)
         )
+        await app.state.provider_router.start()
 
         # Load cache on startup
         try:
@@ -164,15 +176,25 @@ def create_app() -> FastAPI:
             await response_cache.clear()
         except Exception:
             pass
+        # Browser pages, WebSockets and pending Puter requests are stopped
+        # before the shared HTTP transport is closed.
+        try:
+            await app.state.provider_router.stop()
+        except Exception:
+            logger.debug("Provider router cleanup failed", exc_info=True)
         await app.state.http_client.aclose()
         logger.info("Stopped Free Codex server.")
 
     app = FastAPI(
         title="Free Codex",
-        description="OpenAI-compatible API layer for Codex CLI and hosted models.",
-        version="0.3.0",
+        description="Provider-neutral local OpenAI-compatible router for Codex clients.",
+        version="0.4.0",
         lifespan=lifespan
     )
+    # Eager, no-network registry. It enables /v1/models and admin status even
+    # before lifespan and keeps all client-facing routes on one local base URL.
+    from .providers.router import ProviderRouter
+    app.state.provider_router = ProviderRouter(settings)
 
     # CORS Middleware - Allow requests from any origin for development
     # In production, restrict this to your Codex installation
@@ -196,7 +218,10 @@ def create_app() -> FastAPI:
         # Add request ID to app state for logging
         request.state.request_id = request_id
 
-        # Rate limiting for API endpoints
+        # Rate limiting is charged exactly once per incoming client request.
+        # Provider retries/failover happen behind this boundary and must not
+        # consume the local client limit a second time.
+        rate_info = None
         if request.url.path.startswith("/v1/") or request.url.path.startswith("/admin/api/"):
             client_id = _rate_limiter.get_client_id(request)
             allowed, rate_info = await _rate_limiter.is_allowed(client_id)
@@ -230,10 +255,8 @@ def create_app() -> FastAPI:
             response.headers["X-Request-ID"] = request_id
             response.headers["X-Response-Time"] = f"{(time.time() - start_time) * 1000:.1f}ms"
 
-            # Add rate limit headers
-            if request.url.path.startswith("/v1/"):
-                client_id = _rate_limiter.get_client_id(request)
-                _, rate_info = await _rate_limiter.is_allowed(client_id)
+            # Reuse the decision made above; do not increment counters again.
+            if request.url.path.startswith("/v1/") and rate_info is not None:
                 response.headers["X-RateLimit-Limit"] = str(rate_info["limit"])
                 response.headers["X-RateLimit-Remaining"] = str(rate_info["remaining"])
                 response.headers["X-RateLimit-Reset"] = str(rate_info["reset"])
@@ -262,6 +285,13 @@ def create_app() -> FastAPI:
 
         if isinstance(exc, HTTPException):
             raise exc
+        from .providers.base import ProviderError
+        if isinstance(exc, ProviderError):
+            return JSONResponse(
+                status_code=exc.status_code,
+                content=exc.as_openai_error(),
+                headers={"X-Request-ID": request_id},
+            )
 
         logger.error(
             f"Unhandled exception: {str(exc)}",
@@ -289,13 +319,17 @@ def create_app() -> FastAPI:
     from .routes.models import router as models_router
     from .routes.responses import router as responses_router
     from .routes.embeddings import router as embeddings_router
+    from .routes.puter_bridge import router as puter_bridge_router
+    from .routes.admin_providers import router as admin_providers_router
 
     app.include_router(admin_router)
     app.include_router(admin_nim_router)
+    app.include_router(admin_providers_router)
     app.include_router(chat_router, prefix="/v1")
     app.include_router(models_router, prefix="/v1")
     app.include_router(responses_router, prefix="/v1")
     app.include_router(embeddings_router)
+    app.include_router(puter_bridge_router)
 
     # Mount static files
     static_admin = Path(__file__).resolve().parent / "static" / "admin"
@@ -327,12 +361,18 @@ def create_app() -> FastAPI:
 
         request_id = getattr(request.state, "request_id", "unknown")
 
+        providers = await request.app.state.provider_router.providers_status(probe=False)
         return JSONResponse(
             content={
                 "status": "healthy",
-                "version": "0.3.0",
+                "version": "0.4.0",
                 "request_id": request_id,
                 "cache": response_cache.get_stats(),
+                "providers": providers,
+                "provider_readiness": {
+                    row.get("id", "unknown"): (row.get("health") or {}).get("status")
+                    for row in providers
+                },
                 "timestamp": datetime.utcnow().isoformat(),
             },
             headers={"X-Request-ID": request_id},
@@ -347,10 +387,15 @@ def create_app() -> FastAPI:
         return JSONResponse(
             content={
                 "id": "free-codex",
-                "version": "0.3.0",
+                "version": "0.4.0",
+                "default_provider": request.app.state.provider_router.settings.default_provider,
                 "capabilities": {
                     "streaming": True,
                     "tool_calling": True,
+                    "provider_routing": True,
+                    "responses_api": True,
+                    "chat_completions": True,
+                    "legacy_completions": True,
                     "thinking_models": True,
                     "embeddings": True,
                     "workspace_context": True,
