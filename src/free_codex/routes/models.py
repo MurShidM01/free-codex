@@ -1,21 +1,54 @@
-from fastapi import APIRouter
-from ..models import ModelList, ModelInfo
-from ..utils.config import settings
+"""Provider-aware model and capability discovery endpoints."""
+
+from __future__ import annotations
+
+import time
+from typing import Any, Dict
+
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+
+from .chat import get_provider_router
 
 router = APIRouter()
 
 
-@router.get("/models", response_model=ModelList)
-async def list_models():
-    """Advertise the configured NIM model first; keep legacy aliases for compatibility."""
-    primary = (settings.nim_model or "").strip()
-    aliases = ["gpt-3.5-turbo", "gpt-4o", "gpt-4", "nvidia_nim"]
-    ordered: list[str] = []
-    seen: set[str] = set()
-    for mid in [primary, *aliases]:
-        if mid and mid not in seen:
-            seen.add(mid)
-            ordered.append(mid)
-    return ModelList(
-        data=[ModelInfo(id=i, created=1677610602) for i in ordered],
-    )
+@router.get("/models")
+async def list_models(request: Request) -> JSONResponse:
+    """List local aliases and provider/model metadata without secrets."""
+    provider_router = await get_provider_router(request)
+    # Configured models are instant and deterministic. Remote discovery is
+    # intentionally opt-in so /v1/models never blocks Codex startup.
+    discover = request.query_params.get("discover", "").lower() in ("1", "true", "yes")
+    models = await provider_router.list_models(discover=discover)
+    now = int(time.time())
+    data = []
+    for model in models:
+        row = dict(model)
+        row.setdefault("object", "model")
+        row.setdefault("created", now)
+        data.append(row)
+    return JSONResponse({"object": "list", "data": data})
+
+
+@router.get("/providers")
+async def list_providers(request: Request) -> JSONResponse:
+    """Expose sanitized router/provider state for local clients and admin UI."""
+    provider_router = await get_provider_router(request)
+    probe = request.query_params.get("probe", "").lower() in ("1", "true", "yes")
+    return JSONResponse({
+        "object": "list",
+        "default_provider": provider_router.settings.default_provider,
+        "routing": provider_router.settings.routing.to_dict(),
+        "data": await provider_router.providers_status(probe=probe),
+    })
+
+
+@router.get("/providers/{provider_id}")
+async def provider_details(provider_id: str, request: Request) -> JSONResponse:
+    provider_router = await get_provider_router(request)
+    provider = provider_router.get_provider(provider_id)
+    health = await provider.health(probe=False)
+    data: Dict[str, Any] = provider.describe()
+    data["health"] = health.to_dict()
+    return JSONResponse(data)

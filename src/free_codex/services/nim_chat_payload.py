@@ -196,11 +196,18 @@ def normalize_content_blocks(content: list) -> Optional[Union[str, list]]:
         elif btype == "input_image":
             # Another common format
             image_data = block.get("image_bytes") or block.get("url") or block.get("image_url")
+            if isinstance(image_data, dict):
+                image_data = image_data.get("url")
             if image_data:
                 result_blocks.append({
                     "type": "image_url",
                     "image_url": {"url": image_data}
                 })
+        elif btype in ("input_video", "video_url", "input_file"):
+            # Keep optional media/file blocks intact for an explicitly capable
+            # provider instead of silently dropping user input. Default model
+            # capabilities remain conservative.
+            result_blocks.append(dict(block))
 
     # If we only have text blocks, return simple string
     if result_blocks:

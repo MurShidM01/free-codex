@@ -18,6 +18,11 @@ def free_codex_dotenv() -> Path:
     return free_codex_dir() / ".env"
 
 
+def free_codex_providers_toml() -> Path:
+    """Multi-provider router configuration, separate from Codex config.toml."""
+    return free_codex_dir() / "providers.toml"
+
+
 def default_server_health_url() -> str:
     port = int(os.getenv("FREE_CODEX_PORT", "8080"))
     host = os.getenv("FREE_CODEX_HEALTH_HOST", "127.0.0.1")

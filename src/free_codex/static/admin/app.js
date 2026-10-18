@@ -463,6 +463,112 @@ async function copyEnv() {
   }
 }
 
+function providerStatusLabel(provider) {
+  const health = provider.health || {};
+  const status = health.status || "unknown";
+  if (status === "ready" || health.ready) return "Ready";
+  if (status === "authentication_required") return "Authentication required";
+  if (status === "disabled") return "Disabled";
+  return status.replace(/_/g, " ");
+}
+
+async function loadProviders() {
+  const list = $("providers-list");
+  const def = $("providers-default");
+  if (!list || !def) return;
+  try {
+    const data = await fetchJSON("/admin/api/providers");
+    def.textContent = `Default provider: ${data.default_provider || "not configured"}`;
+    list.innerHTML = "";
+    for (const provider of data.providers || []) {
+      const health = provider.health || {};
+      const card = document.createElement("div");
+      card.className = "rounded-xl border border-slate-800/80 bg-slate-950/60 p-4";
+      const title = document.createElement("div");
+      title.className = "flex items-center justify-between gap-3";
+      const left = document.createElement("div");
+      left.innerHTML = `<div class="font-semibold text-slate-100">${provider.id || "provider"}</div><div class="mt-1 text-xs font-mono text-slate-500">${provider.type || ""}</div>`;
+      const badge = document.createElement("span");
+      badge.className = health.ready ? TEST_WORKING : (health.status === "authentication_required" ? "inline-flex rounded-full bg-amber-500/20 px-2 py-1 text-xs font-semibold text-amber-200" : TEST_FAILED);
+      badge.textContent = providerStatusLabel(provider);
+      title.append(left, badge);
+      const notes = document.createElement("p");
+      notes.className = "mt-3 text-xs leading-relaxed text-slate-400";
+      const caps = provider.capabilities || {};
+      const supported = ["streaming", "tool_calling", "image_input", "structured_output"].filter((key) => caps[key]).join(", ") || "text input";
+      notes.textContent = `Model: ${provider.default_model || "not set"} · ${supported}`;
+      card.append(title, notes);
+      const actions = document.createElement("div");
+      actions.className = "mt-3 flex flex-wrap gap-2";
+      const test = document.createElement("button");
+      test.type = "button";
+      test.className = "rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-800";
+      test.textContent = "Test";
+      test.addEventListener("click", async () => {
+        try {
+          const out = await fetchJSON(`/admin/api/providers/${encodeURIComponent(provider.id)}/test`, { method: "POST" });
+          showBanner(out.ok ? "ok" : "err", out.ok ? `${provider.id} is ready.` : (out.health?.message || `${provider.id} is not ready.`));
+          await loadProviders();
+        } catch (e) { showBanner("err", e.body?.detail || e.message); }
+      });
+      const select = document.createElement("button");
+      select.type = "button";
+      select.className = "rounded-lg border border-teal-700/60 bg-teal-950/30 px-2.5 py-1.5 text-xs text-teal-200 hover:bg-teal-900/40";
+      select.textContent = "Use as default";
+      select.addEventListener("click", async () => {
+        const model = window.prompt("Optional model for this server session (leave blank for current default):", provider.default_model || "");
+        if (model === null) return;
+        try {
+          const out = await fetchJSON("/admin/api/providers/select", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: provider.id, model: model || null }) });
+          showBanner("ok", out.hint || `Selected ${provider.id}.`);
+          await loadProviders();
+        } catch (e) { showBanner("err", e.body?.detail || e.message); }
+      });
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-800";
+      toggle.textContent = provider.enabled ? "Disable" : "Enable";
+      toggle.addEventListener("click", async () => {
+        try {
+          const out = await fetchJSON(`/admin/api/providers/${encodeURIComponent(provider.id)}/enabled`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: !provider.enabled }) });
+          showBanner("ok", out.hint || "Provider updated.");
+          await loadProviders();
+        } catch (e) { showBanner("err", e.body?.detail || e.message); }
+      });
+      actions.append(test, select, toggle);
+      card.appendChild(actions);
+      if (provider.id === "puter_web" && health.status === "authentication_required") {
+        const hint = document.createElement("p");
+        hint.className = "mt-2 text-xs text-amber-300";
+        hint.textContent = "Run fc-puter-auth to complete one-time sign-in. No Puter page is shown here.";
+        const auth = document.createElement("button");
+        auth.type = "button";
+        auth.className = "mt-2 rounded-lg border border-amber-600/50 bg-amber-950/30 px-2.5 py-1.5 text-xs text-amber-200 hover:bg-amber-900/40";
+        auth.textContent = "Open one-time auth";
+        auth.addEventListener("click", async () => {
+          try {
+            const out = await fetchJSON("/admin/api/providers/puter-web/auth", { method: "POST" });
+            showBanner("ok", out.message || "Authentication window opened.");
+          } catch (e) { showBanner("err", e.body?.detail || e.message); }
+        });
+        card.append(hint, auth);
+      }
+      list.appendChild(card);
+    }
+    if (!list.children.length) list.textContent = "No enabled providers are configured.";
+    const eventBox = $("providers-events");
+    if (eventBox) {
+      const events = (data.recent_events || []).map((e) => ({
+        event: e.event, provider: e.provider, model: e.model, status: e.status,
+        latency_ms: e.latency_ms, error_type: e.error_type
+      }));
+      eventBox.textContent = events.length ? events.map((e) => JSON.stringify(e)).join("\n") : "No sanitized provider events yet.";
+    }
+  } catch (e) {
+    list.textContent = "Could not load provider status.";
+  }
+}
+
 $("reload").addEventListener("click", () => withBtn($("reload"), loadEnv));
 $("unlock").addEventListener("click", () => withBtn($("unlock"), loadEnv));
 $("save").addEventListener("click", saveEnv);
@@ -470,9 +576,12 @@ $("validate").addEventListener("click", validateEnv);
 $("copy-env").addEventListener("click", copyEnv);
 $("nim-list").addEventListener("click", nimListModels);
 $("nim-test").addEventListener("click", nimTestChat);
+const providersRefresh = $("providers-refresh");
+if (providersRefresh) providersRefresh.addEventListener("click", () => withBtn(providersRefresh, loadProviders));
 window.addEventListener("resize", adjustEnvHeight);
 
 loadEnv();
+loadProviders();
 
 // Animated number counter
 function animateValue(element, start, end, duration, isCurrency = false, decimals = 0) {

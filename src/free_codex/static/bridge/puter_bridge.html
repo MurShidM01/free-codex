@@ -1,0 +1,202 @@
+<!doctype html>
+<!--
+  Free Codex internal Puter.js worker. This page is not an application UI.
+  It is only loaded in a managed local Chromium context after a nonce-bound
+  localhost session is created by the Python server.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="no-referrer">
+  <title>Free Codex provider worker</title>
+  <style>html,body{margin:0;background:transparent;color:transparent}</style>
+  <script src="https://js.puter.com/v2/"></script>
+</head>
+<body aria-hidden="true">
+<script>
+(() => {
+  "use strict";
+  const url = new URL(window.location.href);
+  const parts = window.location.pathname.split("/");
+  const sessionId = parts[parts.length - 1];
+  const nonce = url.searchParams.get("nonce") || "";
+  const wantsAuth = url.searchParams.get("auth") === "1";
+  const wsScheme = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(`${wsScheme}//${window.location.host}/internal/puter-bridge/${encodeURIComponent(sessionId)}/ws?nonce=${encodeURIComponent(nonce)}`);
+  const active = new Map();
+  const conversations = new Map();
+
+  function send(value) {
+    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(value));
+  }
+
+  function safeError(error) {
+    // SDK errors can include request fragments. Never serialize raw browser
+    // errors, stacks, cookies, or SDK objects across the local bridge.
+    return { message: "Puter.js request failed.", type: "puter_web_error" };
+  }
+
+  async function isAuthenticated() {
+    try {
+      if (!window.puter || !puter.auth) return false;
+      if (typeof puter.auth.isSignedIn === "function") return !!(await puter.auth.isSignedIn());
+      if (typeof puter.auth.getUser === "function") return !!(await puter.auth.getUser());
+      return false;
+    } catch (_) { return false; }
+  }
+
+  function textFrom(value) {
+    if (typeof value === "string") return value;
+    if (!value || typeof value !== "object") return "";
+    if (typeof value.text === "string") return value.text;
+    if (typeof value.content === "string") return value.content;
+    if (value.message && typeof value.message.content === "string") return value.message.content;
+    if (Array.isArray(value.content)) {
+      return value.content.map((item) => item && (item.text || item.content) || "").join("");
+    }
+    return "";
+  }
+
+  function normalizeToolCalls(value) {
+    if (!value || typeof value !== "object") return [];
+    const calls = value.tool_calls || value.toolCalls || (value.function_call ? [value.function_call] : []);
+    if (!Array.isArray(calls)) return [];
+    return calls.map((call, index) => {
+      const fn = call.function || call;
+      if (!fn || !fn.name) return null;
+      let args = fn.arguments;
+      if (args === undefined || args === null) args = "{}";
+      if (typeof args !== "string") {
+        try { args = JSON.stringify(args); } catch (_) { args = "{}"; }
+      }
+      return {
+        id: String(call.id || `puter_call_${index}`),
+        type: "function",
+        function: { name: String(fn.name), arguments: args }
+      };
+    }).filter(Boolean);
+  }
+
+  function puterMessages(request, conversationId) {
+    let messages = conversations.get(conversationId);
+    if (Array.isArray(messages)) {
+      messages = messages.slice();
+      // A Responses continuation normally carries only new input. Tool
+      // outputs are appended below with stable call IDs, so do not duplicate
+      // role=tool messages from the normalized request list.
+      if (request.append_messages && Array.isArray(request.messages)) {
+        for (const message of request.messages) {
+          if (message && message.role !== "tool") messages.push(message);
+        }
+      }
+    } else {
+      messages = Array.isArray(request.messages) ? request.messages.slice() : [];
+    }
+    const toolResults = Array.isArray(request.tool_results) ? request.tool_results : [];
+    for (const result of toolResults) {
+      if (!result || !result.call_id) continue;
+      messages.push({
+        role: "tool",
+        tool_call_id: String(result.call_id),
+        content: typeof result.output === "string" ? result.output : JSON.stringify(result.output || "")
+      });
+    }
+    return messages;
+  }
+
+  async function invoke(command) {
+    const requestId = String(command.request_id || "");
+    const request = command.request || {};
+    const conversationId = String(command.conversation_id || request.conversation_id || requestId);
+    if (!requestId || !window.puter || !puter.ai || typeof puter.ai.chat !== "function") {
+      send({ type: "event", request_id: requestId, event: { type: "error", error: { message: "Puter.js AI chat is unavailable." } } });
+      return;
+    }
+    const controller = new AbortController();
+    active.set(requestId, controller);
+    let aggregate = "";
+    let toolCalls = [];
+    try {
+      const options = {
+        model: request.model,
+        stream: request.stream !== false,
+        signal: controller.signal,
+      };
+      // These are documented/public SDK options where supported. Undefined
+      // values are omitted so unsupported optional controls are not fabricated.
+      for (const key of ["temperature", "top_p", "max_tokens", "max_output_tokens", "tool_choice", "response_format", "parallel_tool_calls"]) {
+        if (request[key] !== undefined && request[key] !== null) options[key] = request[key];
+      }
+      if (Array.isArray(request.tools) && request.tools.length) options.tools = request.tools;
+      const messages = puterMessages(request, conversationId);
+      const result = await puter.ai.chat(messages, options);
+      if (result && typeof result[Symbol.asyncIterator] === "function") {
+        for await (const chunk of result) {
+          if (controller.signal.aborted) break;
+          const text = textFrom(chunk);
+          if (text) {
+            aggregate += text;
+            send({ type: "event", request_id: requestId, event: { type: "delta", delta: text } });
+          }
+          const calls = normalizeToolCalls(chunk);
+          for (const call of calls) {
+            if (!toolCalls.some((item) => item.id === call.id)) {
+              toolCalls.push(call);
+              send({ type: "event", request_id: requestId, event: { type: "tool_call", tool_call: call } });
+            }
+          }
+        }
+      } else {
+        const text = textFrom(result);
+        if (text) {
+          aggregate += text;
+          send({ type: "event", request_id: requestId, event: { type: "delta", delta: text } });
+        }
+        toolCalls = normalizeToolCalls(result);
+        for (const call of toolCalls) send({ type: "event", request_id: requestId, event: { type: "tool_call", tool_call: call } });
+      }
+      const nextHistory = messages.slice();
+      if (aggregate || toolCalls.length) {
+        nextHistory.push({ role: "assistant", content: aggregate, tool_calls: toolCalls });
+      }
+      conversations.set(conversationId, nextHistory);
+      send({ type: "event", request_id: requestId, event: { type: "completed", text: aggregate, tool_calls: toolCalls, conversation_id: conversationId } });
+    } catch (error) {
+      send({ type: "event", request_id: requestId, event: { type: "error", error: safeError(error) } });
+    } finally {
+      active.delete(requestId);
+    }
+  }
+
+  ws.addEventListener("open", async () => {
+    send({ type: "hello", session_id: sessionId });
+    let authenticated = await isAuthenticated();
+    if (wantsAuth && !authenticated) {
+      try {
+        // Documented Puter.js authentication API. The user, not automation,
+        // completes any popup/interactive step. No credentials are inspected.
+        if (window.puter && puter.auth && typeof puter.auth.signIn === "function") await puter.auth.signIn();
+      } catch (_) { /* ready state below reports unauthenticated */ }
+      authenticated = await isAuthenticated();
+    }
+    send({ type: "ready", sdk_ready: !!(window.puter && puter.ai && puter.ai.chat), authenticated });
+  });
+
+  ws.addEventListener("message", async (event) => {
+    let command;
+    try { command = JSON.parse(event.data); } catch (_) { return; }
+    if (!command || typeof command !== "object") return;
+    if (command.type === "request") return invoke(command);
+    if (command.type === "cancel") {
+      const controller = active.get(String(command.request_id || ""));
+      if (controller) controller.abort();
+      return;
+    }
+    if (command.type === "ping") send({ type: "pong" });
+  });
+
+  window.setInterval(() => send({ type: "heartbeat" }), 15000);
+})();
+</script>
+</body>
+</html>
